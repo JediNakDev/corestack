@@ -45,7 +45,15 @@ typedef struct {
   int connected;
 } bcl_transport_t;
 
-bb_result_t bcl_connect(bcl_ctx *ctx, const char *host, int port, const char *ca_path) {
+bb_result_t bcl_connect_why(bcl_ctx *ctx, const char *host, int port, const char *ca_path,
+                            bcl_conn_t *why) {
+  /* Set once here so every failure path below can just return: forgetting to
+   * assign on a new path would report the previous attempt's cause, which is
+   * worse than reporting none. */
+  if (why != NULL) {
+    *why = BCL_CONN_ERR_SOCKET;
+  }
+
   if (ctx == NULL || host == NULL || ca_path == NULL) {
     return BB_ERR_DB;
   }
@@ -68,18 +76,42 @@ bb_result_t bcl_connect(bcl_ctx *ctx, const char *host, int port, const char *ca
   if (inet_pton(AF_INET, host, &addr.sin_addr) != 1) {
     close(t->fd);
     free(t);
+    if (why != NULL) {
+      *why = BCL_CONN_ERR_ADDRESS;
+    }
     return BB_ERR_DB;
   }
 
   if (connect(t->fd, (struct sockaddr *)&addr, sizeof addr) != 0) {
     close(t->fd);
     free(t);
+    if (why != NULL) {
+      *why = BCL_CONN_ERR_REFUSED;
+    }
     return BB_ERR_DB;
   }
 
-  if (session_connect(&t->session, t->fd, ca_path) != SESSION_OK) {
+  /* Past this point the TCP connection is up, so no failure below may be
+   * reported as an unreachable server - see client.h. */
+  int src = session_connect(&t->session, t->fd, ca_path);
+  if (src != SESSION_OK) {
     close(t->fd);
     free(t);
+    if (why != NULL) {
+      switch (src) {
+        case SESSION_ERR_AUTH:
+          *why = BCL_CONN_ERR_CERT;
+          break;
+        case SESSION_ERR_IO:
+          *why = BCL_CONN_ERR_IO;
+          break;
+        default:
+          /* CRYPTO, PROTO, TOOBIG, NOSPACE: the handshake was reached and went
+           * wrong in a way the voter cannot act on differently. One bucket. */
+          *why = BCL_CONN_ERR_PROTO;
+          break;
+      }
+    }
     return BB_ERR_DB;
   }
 
@@ -90,7 +122,21 @@ bb_result_t bcl_connect(bcl_ctx *ctx, const char *host, int port, const char *ca
   t->connected = 1;
   ctx->transport = t;
   bcl_log(ctx, "[transport] connected");
+  if (why != NULL) {
+    *why = BCL_CONN_OK;
+  }
   return BB_OK;
+}
+
+bb_result_t bcl_connect(bcl_ctx *ctx, const char *host, int port, const char *ca_path) {
+  return bcl_connect_why(ctx, host, port, ca_path, NULL);
+}
+
+int bcl_connected(const bcl_ctx *ctx) {
+  if (ctx == NULL || ctx->transport == NULL) {
+    return 0;
+  }
+  return ((const bcl_transport_t *)ctx->transport)->connected ? 1 : 0;
 }
 
 void bcl_disconnect(bcl_ctx *ctx) {

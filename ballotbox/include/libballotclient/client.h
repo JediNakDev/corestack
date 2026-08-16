@@ -76,14 +76,64 @@ typedef struct {
 } bcl_response_t;
 
 /*
- * Open the transport: TCP-connect to host:port, then the tetrissh handshake,
- * verified against ca_path. Must succeed before any bcl_send call. Returns
- * BB_OK, or BB_ERR_DB on any connect/handshake failure - libballotclient's
- * public surface is uniformly bb_result_t-typed, so a failure here is not
- * distinguished further (unreachable host vs. rejected cert); ballotu shows
- * one "could not reach ballotd" message either way.
+ * Why a bcl_connect attempt failed.
+ *
+ * bb_result_t cannot carry this: it is the wire status enum, shared with
+ * libballotbrain and serialised by the codec, and a "the cert was rejected"
+ * value has no meaning as a daemon verdict - the daemon never sends it. So
+ * the cause rides beside the result rather than inside it, and the enum stays
+ * client-local.
+ *
+ * The distinction is not cosmetic. "Nothing is listening" and "something is
+ * listening but it is not the ballotd this CA vouches for" are the same
+ * BB_ERR_DB to a caller, and reporting the second as the first tells a voter
+ * to go check a server that is running perfectly well - while hiding the one
+ * failure that actually matters for a vote's integrity.
  */
+typedef enum {
+  BCL_CONN_OK,           /* connected and handshaken */
+  BCL_CONN_ERR_ADDRESS,  /* host is not a dotted-quad IPv4 address */
+  BCL_CONN_ERR_SOCKET,   /* socket() failed, or the ctx/args were unusable */
+  BCL_CONN_ERR_REFUSED,  /* TCP never came up: refused, no route, timed out */
+  BCL_CONN_ERR_CERT,     /* handshake ran, server cert failed CA verification */
+  BCL_CONN_ERR_IO,       /* TCP came up, peer hung up during the handshake */
+  BCL_CONN_ERR_PROTO     /* handshake reached, crypto or protocol error */
+} bcl_conn_t;
+
+/*
+ * Open the transport: TCP-connect to host:port, then the tetrissh handshake,
+ * verified against ca_path. Must succeed before any bcl_send call.
+ *
+ * Returns BB_OK, or BB_ERR_DB on any connect/handshake failure - the public
+ * surface stays uniformly bb_result_t-typed. When `why` is non-NULL it also
+ * receives the cause, which is what a UI needs to say something true: only
+ * BCL_CONN_ERR_ADDRESS/SOCKET/REFUSED mean the TCP step itself failed, so a
+ * progress panel must not mark that step bad for the others - the server WAS
+ * reached in those cases, and saying otherwise sends the voter looking in the
+ * wrong place (this is the mistake tetrisu's screen_connect documents at its
+ * CLIENT_ERR_CONNECT branch).
+ *
+ * bcl_connect is bcl_connect_why with `why` = NULL, kept for callers that do
+ * not report causes (the tests, and ballotctl's admin-only path).
+ */
+bb_result_t bcl_connect_why(bcl_ctx *ctx, const char *host, int port, const char *ca_path,
+                            bcl_conn_t *why);
 bb_result_t bcl_connect(bcl_ctx *ctx, const char *host, int port, const char *ca_path);
+
+/*
+ * Is the voter-channel transport still usable?
+ *
+ * 1 only while a bcl_connect has succeeded and no send/recv has since marked
+ * the session dead (see send_via_session: a failed session_send, or a recv
+ * that returned SESSION_ERR_IO/TOOBIG, clears the flag and every later
+ * bcl_send fails immediately).
+ *
+ * Exists because BB_ERR_DB from bcl_send is ambiguous - it is both "the wire
+ * broke" and "the daemon answered, and its answer was a database failure" -
+ * and a UI that wants to offer a reconnect must not offer one for the second.
+ * Ask here instead of guessing from the status.
+ */
+int bcl_connected(const bcl_ctx *ctx);
 
 /* Close the transport, if one is open. Safe to call on an unconnected or
  * already-disconnected ctx. NOT called automatically by bcl_destroy (that

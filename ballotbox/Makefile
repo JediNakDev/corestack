@@ -19,8 +19,15 @@ BINS := $(SHARED_BINS) $(BIN_DIR)/ballotd $(BIN_DIR)/ballot_session \
 
 # rc, secret and java as in tetriSH's `all`: .tetrishrc, auth/jwt_secret and the
 # jar are generated per checkout, and all three are no-ops once they exist.
-.PHONY: all
+.PHONY: all client
 all: dirs rc secret java $(LIBS) $(BINS)
+
+# The client half only: ballotu and the libraries it needs, plus the shell it
+# runs inside - no ballotd, no ballotctl, no java. Drops straight into
+# ./tetrish, the same way tetriSH's `client` does for tetrisu; run `ballotu`
+# once inside the shell to connect to a ballotd elsewhere.
+client: dirs rc tetrish $(BIN_DIR)/ballotu
+	./tetrish
 
 # === Libraries ===
 LIBBALLOTBRAIN_SRCS  := $(wildcard src/libballotbrain/*.c)

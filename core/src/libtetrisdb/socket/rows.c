@@ -1,5 +1,6 @@
 #include "libtetrisdb/socket/db.h"
 
+#include <limits.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -68,7 +69,13 @@ static int block_count(const char *rows)
         int said = 0, digits = 0;
         while (*t >= '0' && *t <= '9')
         {
-            said = said * 10 + (*t++ - '0');
+            int digit = *t - '0';
+            /* Before the multiply: signed overflow is UB, and a count too big
+             * for an int cannot equal n anyway. */
+            if (said > (INT_MAX - digit) / 10)
+                return -1;
+            said = said * 10 + digit;
+            t++;
             digits++;
         }
         if (digits == 0 || strncmp(t, " rows.", 6) != 0)

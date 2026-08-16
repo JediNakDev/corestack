@@ -55,8 +55,8 @@
 #include "libhtttp/htttp.h"
 #include "libtetrisdb/schema.h"
 #include "libtetrisdb/socket/conf.h"
-#include "libtetrissh/tetrissh.h"
 #include "tetrisdb/runner.h"
+#include "libtetrissh/tetrissh.h"
 
 /* ---- stage 1-2 fixture: this file's own sandboxed SimpleDB --------------- */
 

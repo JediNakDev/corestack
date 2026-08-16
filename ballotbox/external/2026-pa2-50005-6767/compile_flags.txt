@@ -1,0 +1,6 @@
+-Iincludes
+-Iincludes/libs
+-Wall
+-Wextra
+-std=c11
+-I/opt/homebrew/opt/openssl@3/include

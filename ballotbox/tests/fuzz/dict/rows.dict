@@ -1,0 +1,14 @@
+# Dictionary for SimpleDB select-reply parsing (src/libtetrisdb/socket/rows.c).
+# The table is Query.execute()'s output, wrapped in parser narration that this
+# code has to skip past.
+
+tab="\x09"
+newline="\x0a"
+rule="----------------------------"
+rows_suffix=" rows."
+header="id\x09salt\x09digest\x09iters\x09"
+narration_txn="Started a new transaction tid = 3"
+narration_scan="Added scan of table user"
+narration_field="Added select list field user.salt"
+count_zero=" 0 rows."
+count_one=" 1 rows."

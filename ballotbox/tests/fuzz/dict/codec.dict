@@ -1,0 +1,68 @@
+# Dictionary for the BallotBox wire mapping (include/libballotclient/codec.h).
+# Layered on top of htttp.dict's grammar tokens: these are the body keys, and
+# a body is "key=value" lines with repeated keys for arrays.
+
+# Request body keys.
+k_election_id="election_id="
+k_title="title="
+k_open_time="open_time="
+k_close_time="close_time="
+k_option="option="
+k_eligible="eligible="
+k_nonce="nonce="
+k_payload="payload="
+k_hash="hash="
+
+# Response body keys.
+k_status="status="
+k_state="state="
+k_tally_count="tally_count="
+k_tally="tally="
+k_hash_count="hash_count="
+k_row="row="
+k_found="found="
+k_found_option="found_option="
+k_found_option_name="found_option_name="
+k_issued_at="issued_at="
+k_has_prior="has_prior_ballot="
+k_prior_version="prior_ballot_version="
+
+# The status vocabulary: the body's status= line is authoritative, so these
+# names are a parsed field, not decoration.
+r_ok="BB_OK"
+r_config_title="BB_ERR_CONFIG_TITLE"
+r_config_options="BB_ERR_CONFIG_OPTIONS"
+r_config_time="BB_ERR_CONFIG_TIME"
+r_id_taken="BB_ERR_CONFIG_ID_TAKEN"
+r_illegal="BB_ERR_ILLEGAL_TRANSITION"
+r_not_open="BB_ERR_NOT_OPEN"
+r_closed="BB_ERR_CLOSED"
+r_not_published="BB_ERR_NOT_PUBLISHED"
+r_not_eligible="BB_ERR_NOT_ELIGIBLE"
+r_cert_invalid="BB_ERR_CERT_INVALID"
+r_cert_expired="BB_ERR_CERT_EXPIRED"
+r_bad_option="BB_ERR_BAD_OPTION"
+r_replay="BB_ERR_REPLAY"
+r_decrypt="BB_ERR_DECRYPT"
+r_not_found="BB_ERR_NOT_FOUND"
+r_not_joined="BB_ERR_NOT_JOINED"
+r_db="BB_ERR_DB"
+
+# States.
+st_draft="BB_STATE_DRAFT"
+st_open="BB_STATE_OPEN"
+st_closed="BB_STATE_CLOSED"
+st_published="BB_STATE_PUBLISHED"
+
+# Payload hex: even and odd lengths both matter (hex_decode refuses odd), and
+# 512 hex chars is BB_CIPHERTEXT_MAX exactly.
+hex_even="deadbeef"
+hex_odd="abc"
+hex_upper="DEADBEEF"
+
+# The array bounds: BB_MAX_OPTIONS 16, BB_MAX_VOTERS 64.
+n_16="16"
+n_17="17"
+n_64="64"
+n_65="65"
+n_neg="-1"

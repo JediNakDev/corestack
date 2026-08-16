@@ -1,0 +1,38 @@
+PATH = PATH_TO_THIS_PROGRAM/bin:/usr/bin:/bin
+
+listen_port = 5555
+
+cert_path   = auth/server_signed.crt
+key_path    = auth/private_key.pem
+ca_path     = auth/cacsertificate.crt
+
+dspawn_pid_dir = var/run
+dspawn_err_dir = var/log
+
+ctl_ipc = var/run/tetrisd.ctl
+
+log_path  = var/log/tetris.log
+log_ipc   = var/run/tetrislogd.sock
+log_level = info
+log_send_attempts = 2
+log_summary_secs = 30
+
+db           = on
+log_db_dir   = var/db_log
+log_db_jar   = db/dist/simpledb.jar
+log_db_java  = java
+log_db_queue = 256
+
+db_dir      = var/db
+db_ipc      = var/run/tetrisdb.sock
+db_sessions = 16
+db_jar      = db/dist/simpledb.jar
+db_java     = java
+db_err_path = var/log/tetrisdb.err
+db_timeout  = 2000
+
+auth_max_attempts = 5
+auth_token_ttl    = 604800
+auth_pbkdf2_iters = 600000
+
+clear

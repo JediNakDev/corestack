@@ -1,0 +1,18 @@
+# Dictionary for jwt_verify (src/libtetrisauth/jwt.c).
+# Three base64url segments joined by dots; the header is strict (alg and typ
+# only), the payload tolerates unknown claims but requires all four of ours.
+
+dot="."
+header_hs256="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+j_alg="\"alg\""
+j_typ="\"typ\""
+j_hs256="\"HS256\""
+j_jwt="\"JWT\""
+j_none="\"none\""
+j_sub="\"sub\""
+j_name="\"name\""
+j_iat="\"iat\""
+j_exp="\"exp\""
+brace_open="{"
+brace_close="}"
+b64_pad="="

@@ -1,0 +1,25 @@
+name: Full live-runner profile
+
+on:
+  schedule:
+    - cron: "17 19 * * 1"
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y ant libssl-dev libncurses-dev
+
+      - name: Build database runner
+        run: ant -f db/build.xml dist
+
+      - name: Run full live-runner profile
+        run: make test-runner-selftest test-full

@@ -1,0 +1,42 @@
+.vscode/
+bin/
+lib/*.a
+var/
+*.o
+*.d
+.DS_Store
+/tetrish
+.tetrishrc
+external/tetriSH
+*.log
+log
+.cache
+compile_commands.json
+auth/jwt_secret
+# SimpleDB test artifacts, written into the repo root by `ant test`
+simple*.db
+
+# Fuzzing: libFuzzer's raw crash dumps and llvm-cov's output are per-run and
+# machine-local. What IS committed is tests/fuzz/corpus/ (the accumulated
+# knowledge of every run) and tests/fuzz/regress/ (minimised crashes, replayed
+# by `make fuzz-regress` forever) - a crash worth keeping gets filed there, not
+# left in artifacts/.
+tests/fuzz/artifacts/
+tests/fuzz/cov/
+# Fuzzer-discovered corpus inputs.
+#
+# The SEED corpus (make fuzz-seed) IS committed, and gitignore does not apply
+# to already-tracked files, so the seeds keep working normally. This rule only
+# hides what a campaign discovers on top: near-random bytes git cannot
+# delta-compress, in a set that fuzz-merge rewrites wholesale every run.
+# libFuzzer names those files after their SHA1 with no prefix, so there is no
+# pattern that matches them and not the seeds - hence ignore-everything, and
+# the seeds stay visible by virtue of being tracked. Discovered inputs live in
+# the CI cache instead; see .github/workflows/fuzz.yml.
+#
+# Adding a genuinely new seed by hand therefore needs: git add -f <path>.
+tests/fuzz/corpus/*/*
+
+# Coverage counters, dropped wherever an instrumented binary happens to run.
+*.profraw
+*.profdata

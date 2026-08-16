@@ -1,0 +1,10 @@
+.vscode/
+__pycache__/
+.pytest*/
+bin/
+.DS_Store
+archive/
+dspawn.log
+cseshell
+tests/unit/bin
+tests/integration/bin

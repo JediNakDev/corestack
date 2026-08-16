@@ -1,0 +1,66 @@
+# libFuzzer dictionary for the HTTTP grammar (see include/libhtttp/htttp.h).
+#
+# Coverage-guided mutation finds "\r\n" on its own eventually, but every byte
+# it spends discovering the frame shape is a byte not spent on the branches
+# inside the parser. These tokens are the grammar's vocabulary: the version
+# string, the two line terminators, and the header names the apps actually
+# look up.
+
+version="HTTTP/1.0"
+crlf="\x0d\x0a"
+blank_line="\x0d\x0a\x0d\x0a"
+sp=" "
+colon_sp=": "
+
+# Methods. Any token parses as one by design, but these are the tokens a real
+# peer sends, and the ones the dispatchers branch on.
+m_join="JOIN"
+m_cast="CAST"
+m_update="UPDATE"
+m_results="RESULTS"
+m_check="CHECK"
+m_create="CREATE"
+m_open="OPEN"
+m_close="CLOSE"
+m_publish="PUBLISH"
+m_admin_results="ADMIN_RESULTS"
+m_admin_check="ADMIN_CHECK"
+m_admin_next_id="ADMIN_NEXT_ID"
+m_login="LOGIN"
+m_register="REGISTER"
+m_move="MOVE"
+m_upd_game="UPD_GAME"
+m_upd_session="UPD_SESSION"
+
+# Headers.
+h_content_length="Content-Length: "
+h_cert_name="Cert-Name: "
+h_player_id="Player-Id: "
+h_date="Date: "
+
+# Paths.
+p_election="/election"
+p_election_id="/election/e1"
+p_ballot="/election/e1/ballot"
+p_results="/election/e1/results"
+p_check="/election/e1/check"
+p_next_id="/election/next-id"
+
+# Status lines.
+s_200="200 OK"
+s_400="400 Bad Request"
+s_401="401 Unauthorized"
+s_403="403 Forbidden"
+s_404="404 Not Found"
+s_409="409 Conflict"
+s_413="413 Payload Too Large"
+s_429="429 Too Many Requests"
+s_500="500 Internal Server Error"
+
+# The numbers a length field goes wrong at: the frame bound, one past it,
+# and the two overflow edges parse_uint guards.
+n_frame="65536"
+n_frame_plus="65537"
+n_u32_max="4294967295"
+n_u32_max_plus="4294967296"
+n_zero="0"

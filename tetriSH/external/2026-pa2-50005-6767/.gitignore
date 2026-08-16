@@ -1,0 +1,14 @@
+recv_files/
+recv_files_enc/
+send_files_enc/
+
+# Compiled binaries
+ClientWithoutSecurity
+ServerWithoutSecurity
+ClientWithSecurityAP
+ServerWithSecurityAP
+ClientWithSecurityCP1
+ServerWithSecurityCP1
+ClientWithSecurityCP2
+ServerWithSecurityCP2
+*.o

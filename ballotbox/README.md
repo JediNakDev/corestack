@@ -51,6 +51,57 @@ classDef misuse fill:#f8d7da,stroke:#842029,color:#842029
 class MU1,MU2,MU3 misuse
 ```
 
+## Running
+
+```sh
+make all      # ballotd, ballotctl, ballotu, the shell, the shared daemons
+make client   # ballotu only, with client-side libraries, then ./tetrish
+make test
+make clean
+make start    # clean + all, then ./tetrish
+```
+
+### Admin device (runs `ballotd`)
+
+```sh
+make all
+./tetrish
+```
+
+Inside `tetrish`:
+
+```sh
+tetrisdb start
+dspawn2 ballotd
+ballotctl
+```
+
+On the very first run against a brand new `var/db`, run `ballotd` once before
+`tetrisdb start`, then restart the database:
+
+```sh
+dspawn2 ballotd
+tetrisdb stop
+tetrisdb start
+```
+
+After that first run, the normal order above (`tetrisdb start` then
+`dspawn2 ballotd`) is all you need on every later start.
+
+### Voter device (runs `ballotu`)
+
+```sh
+make client
+```
+
+This drops you into `./tetrish`. Inside it:
+
+```sh
+ballotu
+```
+
+Enter the admin device's IP and port when prompted.
+
 ## Designs
 
 ### Solution Class Diagram

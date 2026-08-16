@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #include "libhtttp/htttp.h"
-#include "libtetrisutil/historyview.h"
+#include "tetrisd/historyview.h"
 #include "libtetrisutil/limits.h" /* MAX_USER_NAME */
 #include "libtetrisutil/sessionstate.h" /* SessionPhase */
 #include "libtetrissh/tetrissh.h" /* session_t */

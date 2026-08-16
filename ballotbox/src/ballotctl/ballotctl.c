@@ -33,6 +33,7 @@
 #include "libballotclient/admin.h"
 #include "libtetrisui/tetrisui.h"
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -387,6 +388,16 @@ void screen_check_ballot(void) {
 
 /* ---- entry point ------------------------------------------------------------ */
 
+/* Same reasoning as ballotu.c's handler, same trade - see the comment there.
+ * Kept per-binary rather than lifted into libtetrisui: a handler is a property
+ * of a program, and a library that installed one behind tetrisui_init()'s back
+ * would be overwriting a disposition its caller may own. */
+static void handle_sigint(int signo) {
+  (void)signo;
+  tetrisui_shutdown();
+  _Exit(128 + SIGINT);
+}
+
 static void usage(FILE *out, const char *argv0) {
   fprintf(out,
           "usage: %s [-C ctl_socket] [-h]\n"
@@ -413,6 +424,12 @@ int main(int argc, char **argv) {
     }
   }
 
+  /* A ballotd that closes the admin socket mid-request must not kill us with
+   * SIGPIPE while the terminal is in curses mode - same reasoning as the voter
+   * client's, and the one-shot connection per request here makes a half-closed
+   * socket the likelier case, not the rarer one. */
+  signal(SIGPIPE, SIG_IGN);
+
   g_ctx = bcl_create();
   if (g_ctx == NULL) {
     fprintf(stderr, "ballotctl: bcl_create failed\n");
@@ -420,6 +437,9 @@ int main(int argc, char **argv) {
   }
 
   tetrisui_init();
+  /* After tetrisui_init, never before: the handler tears down curses state, so
+   * it must not be reachable until there is curses state to tear down. */
+  signal(SIGINT, handle_sigint);
   tetrisui_set_status("ballotctl", "(not logged in)", "");
 
   if (screen_login()) {

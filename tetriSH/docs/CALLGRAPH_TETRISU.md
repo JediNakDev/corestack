@@ -504,7 +504,7 @@ flowchart LR
   H_htttp["libhtttp/htttp.h<br/>header_set, serialize_request,<br/>parse_request, parse_response"]
   H_ui["libtetrisui/tetrisui.h<br/>menu, form, list_view, message,<br/>set_status, draw_status_bar,<br/>progress_step / _end, shutdown"]
   H_brain["libtetrisbrain<br/>piece_size, piece_filled,<br/>tetrisbrain_ghost"]
-  H_hview["libtetrisutil/historyview.h<br/>history_lines"]
+  H_hview["tetrisd/historyview.h<br/>history_lines"]
   H_name["libtetrisutil/name.h<br/>user_name_ok"]
   H_rc["libtetrisutil/rc.h<br/>rc_get, rc_get_int"]
   H_auth["libtetrisauth/auth.h<br/>auth_retry_handler"]

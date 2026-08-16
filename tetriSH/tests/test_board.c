@@ -16,7 +16,7 @@
 #include "test_output.h"
 #include <string.h>
 
-#include "libtetrisutil/gamestate.h"
+#include "libtetrisbrain/gamestate.h"
 #include "libtetrisbrain/board.h"
 #include "libtetrisbrain/tetrisbrain.h"
 

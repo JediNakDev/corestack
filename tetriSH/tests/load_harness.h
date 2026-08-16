@@ -38,6 +38,7 @@ typedef struct
     char auth_link[PATH_MAX];
     char daemon_path[PATH_MAX];
     char ca_path[PATH_MAX];
+    char log_path[PATH_MAX];
     pid_t daemon;
 } TestEnv;
 
@@ -115,6 +116,7 @@ static inline void clean_env(TestEnv *env)
 {
     unlink(env->ctl_path);
     unlink(env->rc_path);
+    unlink(env->log_path);
     unlink(env->bin_link);
     unlink(env->auth_link);
     rmdir(env->tmp);
@@ -150,6 +152,7 @@ static inline int start_daemon(TestEnv *env)
     snprintf(env->daemon_path, sizeof env->daemon_path, "%s/bin/tetrisd", repo);
     snprintf(env->ca_path, sizeof env->ca_path, "%s/auth/cacsertificate.crt",
              repo);
+    snprintf(env->log_path, sizeof env->log_path, "%s/tetrisd.log", env->tmp);
     snprintf(repo_bin, sizeof repo_bin, "%s/bin", repo);
     snprintf(repo_auth, sizeof repo_auth, "%s/auth", repo);
 
@@ -162,11 +165,15 @@ static inline int start_daemon(TestEnv *env)
         clean_env(env);
         return -1;
     }
+    /* All six directives rc_config() demands, or tetrisd refuses to start and
+     * the fixture sees only a ctl socket that never appears. */
     fprintf(rc,
             "listen_port = %d\nctl_ipc = %s\nlog_ipc = %s/no-log.sock\n"
             "cert_path = auth/server_signed.crt\n"
-            "key_path = auth/private_key.pem\n",
-            port, env->ctl_path, env->tmp);
+            "key_path = auth/private_key.pem\n"
+            "ca_path = auth/cacsertificate.crt\n"
+            "log_path = %s\n",
+            port, env->ctl_path, env->tmp, env->log_path);
     fclose(rc);
 
     env->daemon = fork();

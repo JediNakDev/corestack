@@ -36,7 +36,7 @@
 #include <string.h>
 
 #include "tetrisu/render.h"
-#include "libtetrisutil/gamestate.h"
+#include "libtetrisbrain/gamestate.h"
 #include "libtetrisbrain/tetrisbrain.h"
 
 #define MIN_ROWS (BOARD_HEIGHT + 5)

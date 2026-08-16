@@ -14,7 +14,8 @@ lib/*.a
 var/
 *.o
 *.d
-/tetrish
+# Not `/tetrish` too: under core.ignorecase=true that also matches the
+# directory tetriSH/, which ignored the whole project.
 */tetrish
 
 # Runtime state and secrets, generated per checkout by `make rc` / `make secret`.

@@ -30,8 +30,8 @@
 #include <stdint.h>
 
 #include "libtetrissh/tetrissh.h"
-#include "libtetrisutil/gamestate.h"
-#include "libtetrisutil/historyview.h"
+#include "libtetrisbrain/gamestate.h"
+#include "tetrisd/historyview.h"
 #include "libtetrisutil/sessionstate.h"
 
 /* Where this client believes it is. Distinct from SessionPhase, which is the

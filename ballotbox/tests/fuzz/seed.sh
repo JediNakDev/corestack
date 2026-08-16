@@ -102,16 +102,7 @@ seed rc_line command    "   ls -la\n"
 seed rc_line directive  "log_level = debug\n"
 
 # --- rc_bind ---------------------------------------------------------------
-# Whole files, since rc_bind reads a path. First byte parity picks the
-# owned_prefix mode, so seeds come in both flavours naturally.
-
-seed rc_bind all_keys "fuzz_level = 3\nfuzz_attempts = 5\nfuzz_queue = 1024\nfuzz_enabled = on\nfuzz_path = /var/log/x\nfuzz_host = localhost\nfuzz_facility = daemon\nfuzz_checked = 50\n"
-seed rc_bind mixed    "# comment\n\nPATH=/bin\nfuzz_level=7\nsome_other_key=whatever\nls -la\n"
-seed rc_bind bad_int  "fuzz_level = 900\n"
-seed rc_bind bad_bool "fuzz_enabled = maybe\n"
-seed rc_bind long_str "fuzz_host = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n"
-seed rc_bind unknown  "fuzz_nonesuch = 1\n"
-seed rc_bind empty    ""
+# Nothing to seed: fuzz_rc_bind.c is not built (see FUZZ_SRCS in ../../Makefile).
 
 # --- playername ------------------------------------------------------------
 

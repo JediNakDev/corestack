@@ -20,7 +20,7 @@
 
 #include "tetrisu/render.h"
 #include "libtetrisbrain/tetrisbrain.h"
-#include "libtetrisutil/gamestate.h"
+#include "libtetrisbrain/gamestate.h"
 
 static long now_ms(void)
 {

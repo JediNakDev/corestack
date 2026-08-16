@@ -1,5 +1,5 @@
-#ifndef LIBTETRISUTIL_HISTORYVIEW_H
-#define LIBTETRISUTIL_HISTORYVIEW_H
+#ifndef TETRISD_HISTORYVIEW_H
+#define TETRISD_HISTORYVIEW_H
 
 #include <stdint.h>
 
@@ -41,4 +41,4 @@ static inline long history_survived_secs(long long ts_start, long long ts_end)
     return d < 0 ? 0 : (long)d;
 }
 
-#endif /* LIBTETRISUTIL_HISTORYVIEW_H */
+#endif /* TETRISD_HISTORYVIEW_H */

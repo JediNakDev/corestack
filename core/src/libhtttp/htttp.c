@@ -67,6 +67,10 @@ static int copy_token(char *dst, size_t cap, const uint8_t *src, size_t len)
      * bytes AND the terminator. */
     if (len >= cap)
         return HTTTP_ERR_TOOLONG;
+    /* Validated as a byte range, read back as a C string: an embedded NUL makes
+     * "\0X" the empty key and "Content-Length\0x" equal to "Content-Length". */
+    if (memchr(src, '\0', len) != NULL)
+        return HTTTP_ERR_MALFORMED;
     memcpy(dst, src, len);
     dst[len] = '\0';
     return HTTTP_OK;

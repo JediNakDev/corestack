@@ -39,7 +39,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     FUZZ_CHECK(memchr(name, '\n', size) == NULL);
     FUZZ_CHECK(memchr(name, '\t', size) == NULL);
     FUZZ_CHECK(memchr(name, '\'', size) == NULL);
-    FUZZ_CHECK(size >= 1 && size <= PLAYER_NAME_MAX);
+    FUZZ_CHECK(size >= 1 && size <= USER_NAME_MAX);
 
     /* Accepted names must fold, and folding must be the total ASCII lowercase
      * of the input - the storage form is permanent (no UPDATE in SimpleDB),

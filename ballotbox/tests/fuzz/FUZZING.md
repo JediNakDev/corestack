@@ -60,11 +60,10 @@ how much fixed-size copying it does with it.
 | `fuzz_htttp_response` | same | The mirror. Requests flow both directions in HTTTP, so both parsers run on both ends; the status line is code the request target never reaches. |
 | `fuzz_codec_request` | `codec.c` + `htttp.c` | The real daemon path: bytes → `htttp_parse_request` → `bcl_decode_request`, exactly what `ballotd` does before any eligibility or lifecycle check. |
 | `fuzz_codec_response` | same | The client path. `bcl_decode_response` takes no op, so it will populate any combination of keys — which is what a hostile daemon would send. |
-| `fuzz_jwt_verify` | `core/src/libtetrisauth/jwt.c` | Hand-written base64url and JSON walking on a token the caller fully controls, with an auth decision on the other side. |
+| `fuzz_jwt_verify` | `core/src/libtetrisauth/lib/token.c` | Hand-written field splitting and decimal parsing on a token the caller fully controls, with an auth decision on the other side. Keeps its `jwt` name for its corpus and `regress/` directory. |
 | `fuzz_rows` | `core/src/libtetrisdb/socket/rows.c` | Parses SimpleDB's printed output, narration and all. Every credential check reads its salt and digest through it. |
-| `fuzz_rc_line` | `core/src/libtetrisutil/rc.c` | Decides whether a line of `.tetrishrc` is a comment or **a command the shell will run**. |
-| `fuzz_rc_bind` | same | The typed key table three libraries share: bounds, fixed-buffer copies, defect reporting. |
-| `fuzz_playername` | `core/src/libtetrisutil/playername.c` | The allowlist that lets `tdb_quote`, the credential body split, and the select-reply parser each skip an escaping step. |
+| `fuzz_rc_line` | `core/src/tetrish/lib/rc_parser.c` | Decides whether a line of `.tetrishrc` is a comment, a directive, or **a command the shell will run**. |
+| `fuzz_playername` | `core/src/libtetrisutil/name.c` | The allowlist that lets `db_quote`, the credential body split, and the select-reply parser each skip an escaping step. |
 | `fuzz_ctl_frame` | `include/libballotclient/ctl_frame.h` | 4-byte length prefix, attacker-chosen, read into a fixed buffer. Driven over a real socketpair so short reads and torn frames actually happen. |
 
 Not yet covered, in rough priority order: `session_recv` (libtetrissh's framing,
@@ -106,7 +105,8 @@ tests/fuzz/
   fuzz_support.h      FUZZ_CHECK, the C-string and slice-containment predicates
   replay_main.c       the standalone main() for bin/replay_* (see "two compilers")
   jwt_fuzz_secret.h   signing key + fixed clock, shared by the target and seedgen
-  seedgen_jwt.c       mints the JWT corpus (a valid HS256 token cannot be printf'd)
+  seedgen_jwt.c       mints the token corpus (a valid HMAC token cannot be printf'd)
+  fuzz_rc_bind.c      NOT BUILT - targets rc_bind(), which this repo lacks
   seed.sh             writes every other seed corpus; idempotent
   run.sh              runs every target for N seconds, files crashes, summarises
   coverage.sh         replays the corpus under llvm-cov, reports line coverage
@@ -125,14 +125,13 @@ the fuzzer's own instrumentation counters, which flatter the number.
 | Target | execs/sec | corpus (merged) | line coverage of code under test |
 | --- | ---: | ---: | ---: |
 | `fuzz_playername` | ~1.9 M | 32 | 100% |
-| `fuzz_rc_line` | ~1.6 M | 50 | 23% of rc.c (it exercises one of that file's two halves) |
+| `fuzz_rc_line` | ~1.6 M | 50 | 23% of rc_parser.c |
 | `fuzz_htttp_request` | ~140 k | 150 | 64% of htttp.c |
 | `fuzz_htttp_response` | ~140 k | 138 | 73% of htttp.c |
 | `fuzz_codec_request` | ~50 k | 228 | 48% codec.c / 66% htttp.c |
 | `fuzz_codec_response` | ~40 k | 207 | 50% codec.c / 61% htttp.c |
 | `fuzz_ctl_frame` | ~14 k | 12 | socket-bound; 83% branch |
-| `fuzz_rc_bind` | ~14 k | 184 | 83% of rc.c |
-| `fuzz_jwt_verify` | ~8 k | 26 | 79% of jwt.c |
+| `fuzz_jwt_verify` | ~8 k | 26 | 79% of token.c |
 | `fuzz_rows` | ~7 k | 73 | 96% of rows.c |
 
 Six bugs in the first two hours, all filed in `regress/` and fixed:

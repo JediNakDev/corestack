@@ -18,7 +18,13 @@ static void on_hangup(int sig)
 {
     (void)sig;
     rc_reload();
-    (void)config(&opts);
+    /* Best-effort: a failed reload leaves the previous opts in place, and a
+     * signal handler has nowhere safe to report from anyway. Assigned rather
+     * than (void)-cast because GCC does not count the cast as using the result
+     * of a warn_unused_result function where clang does - the cast alone
+     * builds on macOS and fails the Linux CI job. */
+    int cfg_rc = config(&opts);
+    (void)cfg_rc;
     logd_reopen();
 }
 

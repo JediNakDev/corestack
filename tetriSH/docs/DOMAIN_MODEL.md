@@ -1094,15 +1094,15 @@ Tick fan-out measures cadence error per client against the scheduled tick. Battl
 
 | Struct | File | Role |
 | --- | --- | --- |
-| `Piece` | `core/include/libtetrisutil/gamestate.h:67` | Falling piece: kind, rotation, origin |
-| `PlayerStanding` | `core/include/libtetrisutil/gamestate.h:104` | One scoreboard row |
-| `GameState` | `core/include/libtetrisutil/gamestate.h:167` | Whole board + engine counters + room scoreboard |
+| `Piece` | `core/include/libtetrisbrain/gamestate.h:67` | Falling piece: kind, rotation, origin |
+| `PlayerStanding` | `core/include/libtetrisbrain/gamestate.h:104` | One scoreboard row |
+| `GameState` | `core/include/libtetrisbrain/gamestate.h:167` | Whole board + engine counters + room scoreboard |
 | `RoomMember` | `core/include/libtetrisutil/sessionstate.h:39` | One roster row in the lobby |
 | `SessionState` | `core/include/libtetrisutil/sessionstate.h:66` | Phase, room, player id, ownership, roster |
 | `auth_budget_t` | `core/include/libtetrisutil/authbudget.h:50` | Per-connection auth attempt budget |
 | `log_msg_t` | `core/include/libtetrisutil/logmsg.h:31` | The logging datagram on the wire |
-| `history_round_t` | `core/include/libtetrisutil/historyview.h:25` | One past round, 32-bit timestamps |
-| `player_history_t` | `core/include/libtetrisutil/historyview.h:36` | Recent rounds + bests for one player |
+| `history_round_t` | `core/include/tetrisd/historyview.h:25` | One past round, 32-bit timestamps |
+| `player_history_t` | `core/include/tetrisd/historyview.h:36` | Recent rounds + bests for one player |
 | `PieceDef` | `src/libtetrisbrain/piece.c` | Static rotation table entry |
 | `htttp_header_t` | `core/include/libhtttp/htttp.h:71` | One parsed header |
 | `htttp_request_t` | `core/include/libhtttp/htttp.h:81` | Zero-copy parsed request |

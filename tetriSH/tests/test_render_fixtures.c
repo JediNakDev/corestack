@@ -33,7 +33,7 @@
 #include <string.h>
 
 #include "tetrisu/render.h"
-#include "libtetrisutil/gamestate.h"
+#include "libtetrisbrain/gamestate.h"
 #include "libtetrisbrain/piece.h" /* shape table only - no rules, no state */
 
 /* Below this ncurses silently clips and every fixture looks broken for the

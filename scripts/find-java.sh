@@ -28,6 +28,14 @@
 
 min=${1:-17}
 
+# A JAVA_HOME of /usr names the directory the macOS stub lives in, not a JDK.
+# Every probe below runs a java binary, and with that value exported each one
+# is the stub being told to resolve into itself - which blocks, without output
+# or CPU, rather than failing. Drop it here, once, so no probe can inherit it.
+if [ -n "$JAVA_HOME" ] && [ "$(cd "$JAVA_HOME" 2>/dev/null && pwd)" = /usr ]; then
+    unset JAVA_HOME
+fi
+
 # The major version of a java/javac binary: 8 for "1.8.0_452", 17 for "17.0.9",
 # 26 for "26.0.1". Empty if the binary does not run or prints nothing familiar.
 major_of() {
@@ -55,8 +63,28 @@ try_bin() {
 }
 
 # 1. Whatever `java` already resolves to.
+#
+# On macOS that is usually /usr/bin/java, a stub which re-executes the JDK
+# named by JAVA_HOME, or the one /usr/libexec/java_home picks when it is
+# unset. Its directory is not a JDK home, and the callers of this script
+# derive JAVA_HOME from the directory it prints - so answering "/usr/bin"
+# here sets JAVA_HOME=/usr, which is exactly the input that makes the stub
+# resolve to itself and hang. Follow the same two steps the stub follows, so
+# the answer is a real JDK's own bin and the version check below reads that
+# JDK rather than the stub standing in front of it.
 onpath=$(command -v java 2>/dev/null)
-[ -n "$onpath" ] && try_bin "$(dirname "$onpath")"
+if [ -n "$onpath" ]; then
+    onbin=$(dirname "$onpath")
+    if [ "$onbin" = /usr/bin ]; then
+        if [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+            onbin="$JAVA_HOME/bin"
+        elif [ -x /usr/libexec/java_home ]; then
+            stubhome=$(/usr/libexec/java_home 2>/dev/null) &&
+                onbin="$stubhome/bin"
+        fi
+    fi
+    try_bin "$onbin"
+fi
 
 # 2. An explicitly configured JAVA_HOME.
 [ -n "$JAVA_HOME" ] && try_bin "$JAVA_HOME/bin"

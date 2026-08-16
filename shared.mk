@@ -95,6 +95,24 @@ BIN_DIR := bin
 LIB_DIR := lib
 OBJ_DIR := obj
 
+# === The JDK ===
+#
+# SocketRunner needs JDK 16+ (UnixDomainSocketAddress) and build.xml compiles
+# with --release JAVA_MIN; ant's JDK and PATH's `java` disagreeing shows up only
+# as a missing "<<READY>>" handshake, so resolve one JDK here for both.
+JAVA_MIN := 17
+JAVA_BIN := $(shell $(SHARED_ROOT)/scripts/find-java.sh $(JAVA_MIN) 2>/dev/null)
+ifeq ($(JAVA_BIN),)
+$(warning no JDK $(JAVA_MIN)+ found: `make java` and every database-backed \
+suite will fail. Install one - on macOS, `brew install openjdk`.)
+else
+# Guarded: recursive $(MAKE) inherits the exported PATH, so an unguarded
+# prepend would stack a duplicate at every level.
+ifneq ($(JAVA_BIN),$(firstword $(subst :, ,$(PATH))))
+export PATH := $(JAVA_BIN):$(PATH)
+endif
+endif
+
 #
 # Every header, as a prerequisite for everything that compiles.
 #
@@ -228,8 +246,13 @@ dirs:
 # The SimpleDB jar is built once, in the shared db/ tree, and both projects
 # reach it through their db symlink - so `make java` in either one produces the
 # jar the other one also uses.
+#
+# JAVA_HOME is pinned to $(JAVA_BIN) when it can compile: ant prefers JAVA_HOME
+# over PATH, so an older one there would rebuild the same mismatch.
 java:
-	@if [ -n "$$JAVA_HOME" ] && [ ! -x "$$JAVA_HOME/bin/javac" ]; then \
+	@if [ -x "$(JAVA_BIN)/javac" ]; then \
+		JAVA_HOME="$$(cd $(JAVA_BIN)/.. && pwd)"; export JAVA_HOME; \
+	elif [ -n "$$JAVA_HOME" ] && [ ! -x "$$JAVA_HOME/bin/javac" ]; then \
 		echo "ignoring JAVA_HOME without javac: $$JAVA_HOME"; \
 		unset JAVA_HOME; \
 	fi; \

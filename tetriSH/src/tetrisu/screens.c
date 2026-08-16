@@ -17,7 +17,7 @@
 #include <unistd.h>
 
 #include "libtetrisui/tetrisui.h"
-#include "libtetrisutil/historyview.h"
+#include "tetrisd/historyview.h"
 #include "tetrisd/adminmsg.h" /* REJECT_* status codes, shared with the server */
 #include "tetrisu/screens.h"
 

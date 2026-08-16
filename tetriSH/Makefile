@@ -288,6 +288,8 @@ test-endurance: dirs $(TEST_BIN_DIR)/test_load
 test-saturation: dirs $(MEASUREMENT_TEST_BINS)
 	LOAD_IN_S=$${LOAD_IN_S:-60} ./$(TEST_BIN_DIR)/test_saturation
 
+# LOAD_IN_S, as test-stress and test-full above: without it test_load uses its
+# own 2000s-per-scenario default, three times over.
 test-ci: dirs $(FAST_TEST_BINS) $(STRESS_TEST_BINS)
-	./tests/run_all.sh ci $(UNIT_TEST_BINS) $(INTEGRATION_TEST_BINS) \
-		$(E2E_TEST_BINS) $(STRESS_TEST_BINS)
+	LOAD_IN_S=$${LOAD_IN_S:-10} ./tests/run_all.sh ci $(UNIT_TEST_BINS) \
+		$(INTEGRATION_TEST_BINS) $(E2E_TEST_BINS) $(STRESS_TEST_BINS)

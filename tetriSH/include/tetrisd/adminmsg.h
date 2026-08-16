@@ -33,7 +33,7 @@
 #include <unistd.h>
 
 #include "libtetrisutil/sessionstate.h"
-#include "libtetrisutil/gamestate.h" /* PlayerStanding / MAX_STANDINGS */
+#include "libtetrisbrain/gamestate.h" /* PlayerStanding / MAX_STANDINGS */
 
 typedef enum
 {

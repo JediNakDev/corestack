@@ -1,19 +1,20 @@
 /*
- * fuzz_rc_line.c - rc_classify_line() on an arbitrary line.
+ * fuzz_rc_line.c - classify_rc_line() on an arbitrary line.
  *
  * The cheapest target here (no allocation downstream, no I/O) and one of the
  * more consequential: this function decides whether a line of .tetrishrc is a
- * comment, a PATH assignment, or A COMMAND THE SHELL WILL RUN. A line that
- * classifies as RC_LINE_COMMAND is executed. So the interesting failure is not
- * a crash but a misclassification, and the header spells out the edge the
- * fuzzer should be hunting around: "PATHETIC" is a command, "PATH = x" is not.
+ * comment, a PATH assignment, a directive belonging to another reader, or A
+ * COMMAND THE SHELL WILL RUN. A line that classifies as RC_LINE_COMMAND is
+ * executed. So the interesting failure is not a crash but a misclassification,
+ * and the header spells out the edge the fuzzer should be hunting around:
+ * "PATHETIC" is a command, "PATH = x" is not.
  *
  * The returned value is a pointer INTO the caller's buffer, so the other check
  * is containment - a *value that points outside the line, or past its
  * terminator, hands the shell a string of unrelated memory to run.
  */
 
-#include "libtetrisutil/rc.h"
+#include "rc_parser.h" /* the shell's own classifier; -I set in the Makefile */
 #include "fuzz_support.h"
 
 #include <stdlib.h>
@@ -30,7 +31,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   const char *value = (const char *)0xDEAD; /* poison: RC_LINE_EMPTY must
                                              * overwrite this with NULL, not
                                              * merely leave it alone */
-  rc_line_type_t t = rc_classify_line(line, &value);
+  rc_line_type_t t = classify_rc_line(line, &value);
 
   switch (t) {
     case RC_LINE_EMPTY:
@@ -39,6 +40,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
     case RC_LINE_PATH:
     case RC_LINE_COMMAND:
+    case RC_LINE_DIRECTIVE:
       FUZZ_CHECK(value != NULL);
       /* Inside the buffer, including one past the last byte (the empty
        * substring at the terminator is a legal answer for "PATH="). */
@@ -49,7 +51,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       break;
 
     default:
-      /* A fourth value would fall through every caller's switch. */
+      /* A fifth value would fall through every caller's switch. */
       FUZZ_CHECK(0);
   }
 
@@ -69,7 +71,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       memcpy(copy, line, size);
       copy[size] = '\0';
       const char *v2 = NULL;
-      FUZZ_CHECK(rc_classify_line(copy, &v2) == t);
+      FUZZ_CHECK(classify_rc_line(copy, &v2) == t);
       free(copy);
     }
   }

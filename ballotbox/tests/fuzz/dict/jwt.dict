@@ -1,18 +1,32 @@
-# Dictionary for jwt_verify (src/libtetrisauth/jwt.c).
-# Three base64url segments joined by dots; the header is strict (alg and typ
-# only), the payload tolerates unknown claims but requires all four of ours.
+# Dictionary for fuzz_jwt_verify (core/src/libtetrisauth/lib/token.c).
+# Five newline-separated fields - sub, name, iat, exp - then a 64-char hex MAC.
 
-dot="."
-header_hs256="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
-j_alg="\"alg\""
-j_typ="\"typ\""
-j_hs256="\"HS256\""
-j_jwt="\"JWT\""
-j_none="\"none\""
-j_sub="\"sub\""
-j_name="\"name\""
-j_iat="\"iat\""
-j_exp="\"exp\""
-brace_open="{"
-brace_close="}"
-b64_pad="="
+sep="\n"
+
+# Only a 64-character hex field gets past split_token into check_signature.
+mac_zero="0000000000000000000000000000000000000000000000000000000000000000"
+mac_ff="ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+mac_short="000000000000000000000000000000000000000000000000000000000000000"
+mac_long="00000000000000000000000000000000000000000000000000000000000000000"
+
+hex_lower="abcdef"
+hex_upper="ABCDEF"
+digits="0123456789"
+
+# Decimal edges for sub/iat/exp: positive values only, and no wrapping.
+n_zero="0"
+n_one="1"
+n_i64max="9223372036854775807"
+n_i64max_plus="9223372036854775808"
+n_u64max="18446744073709551615"
+n_neg="-1"
+n_plus="+1"
+n_leading_zero="007"
+n_space=" 1"
+
+# Names: the allowlist's alphabet, its 15-character cap, and one over.
+name_min="a"
+name_max="abcdefghijklmno"
+name_over="abcdefghijklmnop"
+name_underscore="_"
+name_dash="-"

@@ -46,7 +46,7 @@ dict_for() {
         fuzz_codec_request|fuzz_codec_response) echo "$dicts/codec.dict" ;;
         fuzz_jwt_verify)                        echo "$dicts/jwt.dict" ;;
         fuzz_rows)                              echo "$dicts/rows.dict" ;;
-        fuzz_rc_line|fuzz_rc_bind)              echo "$dicts/rc.dict" ;;
+        fuzz_rc_line)                           echo "$dicts/rc.dict" ;;
         *)                                      echo "" ;;
     esac
 }

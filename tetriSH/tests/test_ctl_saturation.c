@@ -81,9 +81,11 @@ int main(void)
 
     int port = reserve_port();
     char rc_path[PATH_MAX], ctl_path[PATH_MAX], daemon_path[PATH_MAX];
+    char log_path[PATH_MAX];
     snprintf(rc_path, sizeof rc_path, "%s/.tetrishrc", tmp);
     snprintf(ctl_path, sizeof ctl_path, "%s/tetrisd.ctl", tmp);
     snprintf(daemon_path, sizeof daemon_path, "%s/bin/tetrisd", root);
+    snprintf(log_path, sizeof log_path, "%s/tetrisd.log", tmp);
 
     FILE *rc = fopen(rc_path, "w");
     if (port < 0 || rc == NULL)
@@ -92,8 +94,15 @@ int main(void)
         test_output_summary(1, 1, 0);
         return 1;
     }
-    fprintf(rc, "listen_port = %d\nctl_ipc = %s\nlog_ipc = %s/no-log.sock\n",
-            port, ctl_path, tmp);
+    /* All six directives rc_config() demands, or tetrisd refuses to start and
+     * that reads as "the daemon died under the flood". No handshake here. */
+    fprintf(rc,
+            "listen_port = %d\nctl_ipc = %s\nlog_ipc = %s/no-log.sock\n"
+            "cert_path = %s/auth/server_signed.crt\n"
+            "key_path = %s/auth/private_key.pem\n"
+            "ca_path = %s/auth/cacsertificate.crt\n"
+            "log_path = %s\n",
+            port, ctl_path, tmp, root, root, root, log_path);
     fclose(rc);
 
     pid_t daemon = fork();
@@ -158,6 +167,7 @@ int main(void)
         close(flood[i]);
     unlink(ctl_path);
     unlink(rc_path);
+    unlink(log_path);
     rmdir(tmp);
     if (ok)
         test_output_pass("control shutdown under flooded TCP connections");
@@ -174,6 +184,7 @@ fail:
     }
     unlink(ctl_path);
     unlink(rc_path);
+    unlink(log_path);
     rmdir(tmp);
     test_output_fail("control-plane saturation setup");
     test_output_summary(1, 1, 0);

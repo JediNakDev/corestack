@@ -12,7 +12,7 @@
  */
 
 #include "libtetrisutil/sessionstate.h"
-#include "libtetrisutil/gamestate.h"
+#include "libtetrisbrain/gamestate.h"
 
 /* Everything one session owns. */
 typedef struct

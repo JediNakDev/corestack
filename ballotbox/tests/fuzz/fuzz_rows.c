@@ -1,5 +1,5 @@
 /*
- * fuzz_rows.c - tdb_row_count() / tdb_row_fields() on an arbitrary reply body.
+ * fuzz_rows.c - db_row_count() / db_row_fields() on an arbitrary reply body.
  *
  * These two parse SimpleDB's human-readable select output: a header line, a
  * dashes rule, tab-separated rows, and - the part rows.c is written around -
@@ -9,7 +9,7 @@
  * looks like. Every credential check in libtetrisauth reads its salt and
  * digest through these functions, so a misparse here is an auth bug.
  *
- * tdb_row_fields returns SLICES into body and NUL-terminates nothing, so the
+ * db_row_fields returns SLICES into body and NUL-terminates nothing, so the
  * central check is that every slice it hands back is inside the buffer it was
  * given. An off-by-one there is an over-read in the caller, which is exactly
  * the accident rows.c's header warns about ("nothing is copied ... body must
@@ -37,7 +37,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   memcpy(body, data, size);
   body[size] = '\0';
 
-  int rows = tdb_row_count(body);
+  int rows = db_row_count(body);
 
   /* db.h: the row count is a count or -1. Zero and -1 are documented as
    * different answers ("no such user" vs "this is not an answer"), and any
@@ -55,11 +55,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     memset(f, 0, sizeof f);
     memset(len, 0, sizeof len);
 
-    int n = tdb_row_fields(body, r, f, len, MAX_FIELDS);
+    int n = db_row_fields(body, r, f, len, MAX_FIELDS);
 
     /* A row the count promised exists must be readable. -1 here means the two
      * functions disagree about the same body, and a caller looping to
-     * tdb_row_count() would read uninitialised f[]/len[] on the strength of
+     * db_row_count() would read uninitialised f[]/len[] on the strength of
      * a count that turned out to be a lie. */
     FUZZ_CHECK(n >= 0);
 
@@ -82,8 +82,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   {
     const char *f[MAX_FIELDS];
     size_t len[MAX_FIELDS];
-    FUZZ_CHECK(tdb_row_fields(body, rows, f, len, MAX_FIELDS) == -1);
-    FUZZ_CHECK(tdb_row_fields(body, -1, f, len, MAX_FIELDS) == -1);
+    FUZZ_CHECK(db_row_fields(body, rows, f, len, MAX_FIELDS) == -1);
+    FUZZ_CHECK(db_row_fields(body, -1, f, len, MAX_FIELDS) == -1);
   }
 
   free(body);

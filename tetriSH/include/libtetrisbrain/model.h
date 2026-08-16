@@ -12,6 +12,6 @@
  * Author: Phatsakorn Ukanchanakitti
  */
 
-#include "libtetrisutil/gamestate.h"
+#include "libtetrisbrain/gamestate.h"
 
 #endif /* TETRISBRAIN_MODEL_H */

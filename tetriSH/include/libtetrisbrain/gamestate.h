@@ -1,13 +1,13 @@
-#ifndef LIBTETRISUTIL_GAMESTATE_H
-#define LIBTETRISUTIL_GAMESTATE_H
+#ifndef LIBTETRISBRAIN_GAMESTATE_H
+#define LIBTETRISBRAIN_GAMESTATE_H
 
 /*
  * gamestate.h - the shared tetriSH data model.
  *
- * Plain-old-data only: no logic, no I/O, no link dependency. Lives in
- * libtetrisutil because every component needs these types - libtetrisbrain owns
- * the rules, but tetrisd serialises the state and tetrisu renders it, and all
- * of them must agree on the exact layout.
+ * Plain-old-data only: no logic, no I/O, no link dependency. Lives with the
+ * engine that owns the rules; tetrisd serialises this state and tetrisu renders
+ * it, and all three must agree on the exact layout. Not in core/: ballotbox has
+ * no board, and nothing outside tetriSH has ever included it.
  *
  * Author: Phatsakorn Ukanchanakitti
  */
@@ -166,4 +166,4 @@ typedef struct
     int my_player_id;
 } GameState;
 
-#endif /* LIBTETRISUTIL_GAMESTATE_H */
+#endif /* LIBTETRISBRAIN_GAMESTATE_H */

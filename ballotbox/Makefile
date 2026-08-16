@@ -17,8 +17,10 @@ include ../shared.mk
 BINS := $(SHARED_BINS) $(BIN_DIR)/ballotd $(BIN_DIR)/ballot_session \
         $(BIN_DIR)/ballotctl $(BIN_DIR)/ballotu
 
+# rc, secret and java as in tetriSH's `all`: .tetrishrc, auth/jwt_secret and the
+# jar are generated per checkout, and all three are no-ops once they exist.
 .PHONY: all
-all: dirs $(LIBS) $(BINS)
+all: dirs rc secret java $(LIBS) $(BINS)
 
 # === Libraries ===
 LIBBALLOTBRAIN_SRCS  := $(wildcard src/libballotbrain/*.c)
@@ -145,7 +147,7 @@ $(BIN_DIR)/test_system_e2e: tests/test_system_e2e.c $(DB_RUNNER_SRC) $(LIB_DIR)/
 	$(CC) $(CFLAGS) -I$(SHARED_SRC) $(filter %.c,$^) -o $@ $(LDFLAGS) -lballotclient -lballotbrain -ltetrissh -lhtttp -ltetrisdb -ltetrisutil -lssl -lcrypto -lpthread
 
 .PHONY: test
-test: dirs $(LIB_DIR)/libballotbrain.a $(LIB_DIR)/libballotclient.a $(TEST_BINS) $(BIN_DIR)/test_db $(BIN_DIR)/test_logd $(BIN_DIR)/test_auth $(BIN_DIR)/test_jwt $(BIN_DIR)/test_tetrisdb $(BIN_DIR)/test_ballotd $(BIN_DIR)/test_client_transport
+test: dirs secret $(LIB_DIR)/libballotbrain.a $(LIB_DIR)/libballotclient.a $(TEST_BINS) $(BIN_DIR)/test_db $(BIN_DIR)/test_logd $(BIN_DIR)/test_auth $(BIN_DIR)/test_jwt $(BIN_DIR)/test_tetrisdb $(BIN_DIR)/test_ballotd $(BIN_DIR)/test_client_transport
 	@fail=0; \
 	for t in $(TEST_BINS) $(BIN_DIR)/test_db $(BIN_DIR)/test_logd $(BIN_DIR)/test_tetrisdb $(BIN_DIR)/test_jwt $(BIN_DIR)/test_auth $(BIN_DIR)/test_ballotd $(BIN_DIR)/test_client_transport; do \
 	  echo "== $$t =="; \
@@ -155,7 +157,7 @@ test: dirs $(LIB_DIR)/libballotbrain.a $(LIB_DIR)/libballotclient.a $(TEST_BINS)
 	echo "ALL UNIT TESTS PASSED"
 
 .PHONY: test-ci
-test-ci: dirs $(LIB_DIR)/libballotbrain.a $(LIB_DIR)/libballotclient.a $(TEST_BINS) $(BIN_DIR)/test_db $(BIN_DIR)/test_auth $(BIN_DIR)/test_jwt
+test-ci: dirs secret $(LIB_DIR)/libballotbrain.a $(LIB_DIR)/libballotclient.a $(TEST_BINS) $(BIN_DIR)/test_db $(BIN_DIR)/test_auth $(BIN_DIR)/test_jwt
 	@fail=0; \
 	for t in $(TEST_BINS) $(BIN_DIR)/test_jwt; do \
 	  echo "== $$t =="; \
@@ -221,7 +223,10 @@ REPLAY_CFLAGS := -g -O1 -Wall -Wextra -Iinclude -I$(SHARED_INC) -I$(FUZZ_DIR) \
                  -fsanitize=address,undefined -fno-sanitize-recover=undefined \
                  -fno-omit-frame-pointer
 
-FUZZ_SRCS   := $(wildcard $(FUZZ_DIR)/fuzz_*.c)
+# On disk, not built: it targets rc_bind(), which this repo does not have - rc.h
+# publishes rc_get/rc_get_int/rc_get_bool only. Write rc_bind, delete this.
+FUZZ_EXCLUDED_SRCS := $(FUZZ_DIR)/fuzz_rc_bind.c
+FUZZ_SRCS   := $(filter-out $(FUZZ_EXCLUDED_SRCS),$(wildcard $(FUZZ_DIR)/fuzz_*.c))
 FUZZ_BINS   := $(FUZZ_SRCS:$(FUZZ_DIR)/fuzz_%.c=$(BIN_DIR)/fuzz_%)
 REPLAY_BINS := $(FUZZ_SRCS:$(FUZZ_DIR)/fuzz_%.c=$(BIN_DIR)/replay_%)
 
@@ -234,10 +239,14 @@ FUZZ_UNDER_TEST_fuzz_htttp_request  := $(SHARED_SRC)/libhtttp/htttp.c
 FUZZ_UNDER_TEST_fuzz_htttp_response := $(SHARED_SRC)/libhtttp/htttp.c
 FUZZ_UNDER_TEST_fuzz_codec_request  := src/libballotclient/codec.c $(SHARED_SRC)/libhtttp/htttp.c
 FUZZ_UNDER_TEST_fuzz_codec_response := src/libballotclient/codec.c $(SHARED_SRC)/libhtttp/htttp.c
-FUZZ_UNDER_TEST_fuzz_jwt_verify     := $(SHARED_SRC)/libtetrisauth/jwt.c
+# token.c, not a jwt.c: the format stopped being a JWT. hex.c is compiled in
+# rather than linked so the MAC encoding is instrumented too.
+FUZZ_UNDER_TEST_fuzz_jwt_verify     := $(SHARED_SRC)/libtetrisauth/lib/token.c \
+                                       $(SHARED_SRC)/libtetrisauth/lib/hex.c
 FUZZ_UNDER_TEST_fuzz_rows           := $(SHARED_SRC)/libtetrisdb/socket/rows.c
-FUZZ_UNDER_TEST_fuzz_rc_line        := $(SHARED_SRC)/libtetrisutil/rc.c
-FUZZ_UNDER_TEST_fuzz_rc_bind        := $(SHARED_SRC)/libtetrisutil/rc.c
+# rc_parser.c, not libtetrisutil/rc.c: the line classifier lives with the shell
+# that would run the line; rc.c only answers "value of this key".
+FUZZ_UNDER_TEST_fuzz_rc_line        := $(SHARED_SRC)/tetrish/lib/rc_parser.c
 FUZZ_UNDER_TEST_fuzz_playername     := $(SHARED_SRC)/libtetrisutil/name.c
 # ctl_frame.h is header-only (static inline both ends share), so the harness
 # IS the translation unit under test.
@@ -249,7 +258,13 @@ FUZZ_UNDER_TEST_fuzz_ctl_frame      :=
 # real function, which is a second copy that can drift from the first.
 FUZZ_LDLIBS_fuzz_codec_request  := -L$(LIB_DIR) -lballotbrain -ltetrisdb -ltetrisutil -lpthread
 FUZZ_LDLIBS_fuzz_codec_response := $(FUZZ_LDLIBS_fuzz_codec_request)
-FUZZ_LDLIBS_fuzz_jwt_verify     := -lcrypto
+# -ltetrisutil: token.c reports through logmsg.h, which is not under test.
+FUZZ_LDLIBS_fuzz_jwt_verify     := -L$(LIB_DIR) -ltetrisutil -lcrypto
+
+# Per-target include paths. Neither auth.h (the token layer's private header)
+# nor rc_parser.h is published in core/include, so both are reached by name.
+FUZZ_INCS_fuzz_jwt_verify := -I$(SHARED_SRC)/libtetrisauth/lib
+FUZZ_INCS_fuzz_rc_line    := -I$(SHARED_SRC)/tetrish/lib
 
 # OpenSSL's -I/-L ride in through CFLAGS/LDFLAGS above, which the fuzz build
 # does not use (different compiler, different sanitizers), so the two flags it
@@ -279,12 +294,12 @@ $(BIN_DIR)/fuzz_%: $(FUZZ_DIR)/fuzz_%.c $(FUZZ_DIR)/fuzz_support.h $(HEADERS) $(
 	@test -x "$(FUZZ_CC)" || { \
 	  echo "fuzzing needs Homebrew LLVM (Apple clang has no libFuzzer runtime):"; \
 	  echo "  brew install llvm"; exit 1; }
-	$(FUZZ_CC) $(FUZZ_CFLAGS) $(FUZZ_SSL_CFLAGS) $< \
+	$(FUZZ_CC) $(FUZZ_CFLAGS) $(FUZZ_SSL_CFLAGS) $(FUZZ_INCS_fuzz_$*) $< \
 	  $(FUZZ_UNDER_TEST_fuzz_$*) -o $@ $(FUZZ_SSL_LDFLAGS) $(FUZZ_LDLIBS_fuzz_$*)
 
 $(BIN_DIR)/replay_%: $(FUZZ_DIR)/fuzz_%.c $(FUZZ_DIR)/replay_main.c $(FUZZ_DIR)/fuzz_support.h $(HEADERS) $(FUZZ_ALL_SRCS) Makefile ../shared.mk
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(REPLAY_CFLAGS) $(FUZZ_SSL_CFLAGS) $< $(FUZZ_DIR)/replay_main.c \
+	$(CC) $(REPLAY_CFLAGS) $(FUZZ_SSL_CFLAGS) $(FUZZ_INCS_fuzz_$*) $< $(FUZZ_DIR)/replay_main.c \
 	  $(FUZZ_UNDER_TEST_fuzz_$*) -o $@ $(FUZZ_SSL_LDFLAGS) $(FUZZ_LDLIBS_fuzz_$*)
 
 .PHONY: fuzz-build
@@ -296,10 +311,10 @@ replay-build: $(REPLAY_BINS)
 # The JWT corpus cannot be written by a shell script: a valid HS256 token is
 # not something a mutator (or a printf) will ever produce, and without one the
 # target never gets past "not three segments" into the claim logic.
-$(BIN_DIR)/seedgen_jwt: $(FUZZ_DIR)/seedgen_jwt.c $(SHARED_SRC)/libtetrisauth/jwt.c $(HEADERS)
+$(BIN_DIR)/seedgen_jwt: $(FUZZ_DIR)/seedgen_jwt.c $(SHARED_SRC)/libtetrisauth/lib/token.c $(SHARED_SRC)/libtetrisauth/lib/hex.c $(HEADERS)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) -I$(FUZZ_DIR) $(FUZZ_DIR)/seedgen_jwt.c $(SHARED_SRC)/libtetrisauth/jwt.c \
-	  -o $@ $(LDFLAGS) -lcrypto
+	$(CC) $(CFLAGS) -I$(FUZZ_DIR) $(FUZZ_INCS_fuzz_jwt_verify) $(filter %.c,$^) \
+	  -o $@ $(LDFLAGS) -ltetrisutil -lcrypto
 
 .PHONY: fuzz-seed
 fuzz-seed: $(BIN_DIR)/seedgen_jwt
@@ -324,7 +339,6 @@ FUZZ_DICT_fuzz_codec_response := $(FUZZ_DIR)/dict/codec.dict
 FUZZ_DICT_fuzz_jwt_verify     := $(FUZZ_DIR)/dict/jwt.dict
 FUZZ_DICT_fuzz_rows           := $(FUZZ_DIR)/dict/rows.dict
 FUZZ_DICT_fuzz_rc_line        := $(FUZZ_DIR)/dict/rc.dict
-FUZZ_DICT_fuzz_rc_bind        := $(FUZZ_DIR)/dict/rc.dict
 
 .PHONY: fuzz
 fuzz: $(BIN_DIR)/$(T)

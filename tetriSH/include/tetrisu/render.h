@@ -13,7 +13,7 @@
  * Author: Phatsakorn Ukanchanakitti
  */
 
-#include "libtetrisutil/gamestate.h"
+#include "libtetrisbrain/gamestate.h"
 
 /*
  * Screen columns per board cell.

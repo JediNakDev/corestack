@@ -494,45 +494,48 @@ static int t_garbage_hits_one_opponent(void)
 }
 
 /*
- * The target is drawn per attack, so over many attacks both opponents get
- * some. Guards against a "random" pick that is really fixed on whoever joined
- * first. 24 rounds: a one-sided run by chance is about 1 in 8 million.
+ * The attack goes to the highest-scoring live opponent - handle_garbage picks
+ * on score, not at random and not on a fixed slot.
+ *
+ * The lead is handed over mid-test rather than asserted once: with a single
+ * ranking, a pick that is really fixed on whoever joined first would pass just
+ * as well. Reversing the scores is what separates the two, which is the guard
+ * the earlier random-target test was there to give.
  */
-static int t_garbage_target_varies(void)
+static int t_garbage_targets_highest_score(void)
 {
-    enum
-    {
-        ROUNDS = 24
-    };
     Sess a, b, c;
     int room = join(&a, 135, 0);
     CHECK(room > 0, "a join");
     CHECK(join(&b, 136, room) == room, "b join");
     CHECK(join(&c, 137, room) == room, "c join");
     op(&a, ADMIN_START, 0, 0, 0);
+
+    /* c leads, and c joined last - so a first-slot pick cannot pass this. */
+    op(&b, ADMIN_SCORE, 0, 1, 100);
+    op(&c, ADMIN_SCORE, 0, 5, 800);
     drain(&a);
     drain(&b);
     drain(&c);
 
-    /*
-     * Read each attack back before sending the next. Do NOT batch these: the
-     * admin's ends are non-blocking, so a burst that outruns the socketpair
-     * buffer is wedged and DROPPED, and the count comes up short. The buffer
-     * is ~208K on Linux but ~8K on macOS, so batching passes on one and fails
-     * on the other. op() is synchronous, so this costs nothing.
-     */
     AdminMsg g;
-    int hb = 0, hc = 0;
-    for (int i = 0; i < ROUNDS; i++)
-    {
-        op(&a, ADMIN_GARBAGE, 0, 1, 0);
-        if (recv_type(&b, &g, ADMIN_RECV_GARBAGE, 0) == 0)
-            hb++;
-        else if (recv_type(&c, &g, ADMIN_RECV_GARBAGE, 0) == 0)
-            hc++;
-    }
-    CHECK(hb + hc == ROUNDS, "every attack must land on somebody");
-    CHECK(hb > 0 && hc > 0, "the target must vary between opponents");
+    op(&a, ADMIN_GARBAGE, 0, 4, 0);
+    CHECK(recv_type(&c, &g, ADMIN_RECV_GARBAGE, 0) == 0,
+          "the leader must take the attack");
+    CHECK(g.lines == 4, "line count must survive the hop");
+    CHECK(quiet_but_standings(&b), "the trailing opponent must be spared");
+
+    /* b takes the lead: the target has to follow the score across. */
+    op(&b, ADMIN_SCORE, 0, 9, 1500);
+    drain(&a);
+    drain(&b);
+    drain(&c);
+
+    op(&a, ADMIN_GARBAGE, 0, 2, 0);
+    CHECK(recv_type(&b, &g, ADMIN_RECV_GARBAGE, 0) == 0,
+          "the new leader must take the attack");
+    CHECK(g.lines == 2, "line count must survive the hop");
+    CHECK(quiet_but_standings(&c), "the overtaken opponent must be spared");
 
     sess_close(&a);
     sess_close(&b);
@@ -561,7 +564,13 @@ static int t_garbage_skips_finished_players(void)
     drain(&b);
     drain(&c);
 
-    /* Drained each round, not batched - see t_garbage_target_varies. */
+    /*
+     * Read each attack back before sending the next. Do NOT batch these: the
+     * admin's ends are non-blocking, so a burst that outruns the socketpair
+     * buffer is wedged and DROPPED, and the count comes up short. The buffer
+     * is ~208K on Linux but ~8K on macOS, so batching passes on one and fails
+     * on the other. op() is synchronous, so this costs nothing.
+     */
     AdminMsg g;
     int hc = 0;
     for (int i = 0; i < ROUNDS; i++)
@@ -1401,7 +1410,7 @@ int main(void)
     RUN(t_start_twice_ignored);
 
     RUN(t_garbage_hits_one_opponent);
-    RUN(t_garbage_target_varies);
+    RUN(t_garbage_targets_highest_score);
     RUN(t_garbage_skips_finished_players);
     RUN(t_garbage_alone_in_room);
     RUN(t_garbage_nonpositive_dropped);

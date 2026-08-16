@@ -1,121 +1,31 @@
-CC      := cc
-CFLAGS  := -Wall -Wextra -Werror=unused-result -O2 -Iinclude
-LDFLAGS := -Llib
-
-# Asked once and reused: both the linker group and the OpenSSL lookup below
-# differ between Apple's toolchain and everyone else's.
-UNAME_S := $(shell uname -s)
-# --start-group/--end-group: static archives resolve left-to-right and GNU ld
-# does not re-scan one it already finished with, so any ordering of our own
-# archives here is fragile the moment one of them calls into another (e.g.
-# libballotclient's transport.c calling into libtetrissh - see git history,
-# this line has been "fixed" by reordering twice already). The group makes
-# ld keep re-scanning these until nothing new resolves, so their order here
-# stops being load-bearing. System libs (ssl/crypto/pthread) stay outside:
-# nothing in the group calls back into them in a cycle that needs it.
+# ballotbox - the secure electronic voting system.
 #
-# Apple's linker has no such once-through limitation - it resolves this
-# circularity on its own - and does not recognise --start-group/--end-group
-# at all, so passing them there is a hard link error, not a no-op. GRP_START/
-# GRP_END are therefore empty on Darwin and the real flags everywhere else.
-ifeq ($(UNAME_S),Darwin)
-GRP_START :=
-GRP_END   :=
-else
-GRP_START := -Wl,--start-group
-GRP_END   := -Wl,--end-group
-endif
-LDLIBS  := $(GRP_START) -ltetrisauth -ltetrissh -lhtttp -lballotclient -lballotbrain -ltetrisdb -ltetrisutil $(GRP_END) -lssl -lcrypto -lpthread
-# OpenSSL, wherever the platform keeps it.
-#
-# Homebrew installs outside the compiler's default search path, so macOS needs
-# an explicit -I/-L. A Linux distro package is already on the default path, and
-# asking brew for it there prints "make: brew: No such file or directory" and
-# yields an empty prefix - which then expands to -I/include -L/lib, two paths
-# that are wrong everywhere and merely harmless while the system copy happens
-# to be found anyway.
-#
-# So: only ask brew on Darwin, and only add the flags if the answer is real.
-ifeq ($(UNAME_S),Darwin)
-OPENSSL := $(shell brew --prefix openssl 2>/dev/null)
-endif
-ifneq ($(OPENSSL),)
-CFLAGS  += -I$(OPENSSL)/include
-LDFLAGS += -L$(OPENSSL)/lib
-endif
+# Everything this project shares with tetriSH (the six libtetris* libraries,
+# the tetrish shell, tetrisdb and tetrislogd) is built by ../shared.mk out of
+# ../core. What is left here is ballotbox's own: libballotbrain,
+# libballotclient, ballotd, ballotctl, ballotu, the test suites and the fuzzing
+# harnesses.
 
-BIN_DIR := bin
-LIB_DIR := lib
-
+# Inputs to ../shared.mk, which reads them as it is included.
 #
-# Every header, as a prerequisite for everything that compiles.
-#
-# Without this, changing a struct in include/ rebuilds nothing: make only sees
-# the .c files. That is not a slow build, it is a WRONG one - two objects
-# compiled against different versions of the same struct link cleanly and then
-# disagree about the layout at runtime, which is a bug with no compiler error
-# and no stack trace pointing at its cause.
-#
-# Deliberately coarse: any header touches everything. At this size that costs a
-# couple of seconds, and it cannot be wrong the way a hand-maintained list of
-# per-target dependencies eventually is.
-#
-HEADERS := $(shell find include src -name '*.h' 2>/dev/null)
-ifeq ($(HEADERS),)
-$(warning include/ yielded no headers: builds will not react to header edits)
-endif
+# libballotclient reuses symbols from libballotbrain, so it precedes it.
+PROJECT_LIBS      := -lballotclient -lballotbrain
+PROJECT_LIB_FILES := lib/libballotbrain.a lib/libballotclient.a
 
-LIBS := $(LIB_DIR)/libtetrisauth.a $(LIB_DIR)/libtetrissh.a $(LIB_DIR)/libhtttp.a $(LIB_DIR)/libballotbrain.a \
-        $(LIB_DIR)/libballotclient.a $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a \
-        $(LIB_DIR)/libtetrisui.a
+include ../shared.mk
 
-# tetrish system programs (sys, ...) compiled as standalone binaries, PA1-style.
-TETRISH_LIB_SRCS := $(wildcard src/tetrish/lib/*.c)
-SYSPROG_SRCS     := $(wildcard src/tetrish/system_programs/*.c)
-SYSPROG_BINS     := $(SYSPROG_SRCS:src/tetrish/system_programs/%.c=$(BIN_DIR)/%)
+BINS := $(SHARED_BINS) $(BIN_DIR)/ballotd $(BIN_DIR)/ballot_session \
+        $(BIN_DIR)/ballotctl $(BIN_DIR)/ballotu
 
-BINS := tetrish $(BIN_DIR)/ballotd $(BIN_DIR)/ballot_session $(BIN_DIR)/tetrislogd $(BIN_DIR)/tetrisdb $(BIN_DIR)/ballotctl $(BIN_DIR)/ballotu $(SYSPROG_BINS)
-
-.PHONY: all clean dirs
+.PHONY: all
 all: dirs $(LIBS) $(BINS)
 
-dirs:
-	@mkdir -p $(BIN_DIR) $(LIB_DIR) var/log var/run
-
 # === Libraries ===
-LIBTETRISAUTH_SRCS   := $(wildcard src/libtetrisauth/*.c) \
-                        $(wildcard src/libtetrisauth/lib/*.c)
-LIBTETRISSH_SRCS     := $(wildcard src/libtetrissh/*.c)
-LIBHTTTP_SRCS        := $(wildcard src/libhtttp/*.c)
 LIBBALLOTBRAIN_SRCS  := $(wildcard src/libballotbrain/*.c)
 LIBBALLOTCLIENT_SRCS := $(wildcard src/libballotclient/*.c)
-LIBTETRISDB_SRCS     := $(wildcard src/libtetrisdb/*.c) \
-                        $(wildcard src/libtetrisdb/pipe/*.c) \
-                        $(wildcard src/libtetrisdb/socket/*.c)
-LIBTETRISUTIL_SRCS   := $(wildcard src/libtetrisutil/*.c)
-LIBTETRISUI_SRCS     := $(wildcard src/libtetrisui/*.c)
 
-LIBTETRISAUTH_OBJS   := $(LIBTETRISAUTH_SRCS:.c=.o)
-LIBTETRISSH_OBJS     := $(LIBTETRISSH_SRCS:.c=.o)
-LIBHTTTP_OBJS        := $(LIBHTTTP_SRCS:.c=.o)
-LIBBALLOTBRAIN_OBJS  := $(LIBBALLOTBRAIN_SRCS:.c=.o)
-LIBBALLOTCLIENT_OBJS := $(LIBBALLOTCLIENT_SRCS:.c=.o)
-LIBTETRISDB_OBJS     := $(LIBTETRISDB_SRCS:.c=.o)
-LIBTETRISUTIL_OBJS   := $(LIBTETRISUTIL_SRCS:.c=.o)
-LIBTETRISUI_OBJS     := $(LIBTETRISUI_SRCS:.c=.o)
-
-# Pattern rule: compile .c -> .o
-%.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(LIB_DIR)/libtetrisauth.a: $(LIBTETRISAUTH_OBJS)
-	ar rcs $@ $^
-
-$(LIB_DIR)/libtetrissh.a: $(LIBTETRISSH_OBJS)
-	ar rcs $@ $^
-
-$(LIB_DIR)/libhtttp.a: $(LIBHTTTP_OBJS)
-	ar rcs $@ $^
+LIBBALLOTBRAIN_OBJS  := $(call local_objs,$(LIBBALLOTBRAIN_SRCS))
+LIBBALLOTCLIENT_OBJS := $(call local_objs,$(LIBBALLOTCLIENT_SRCS))
 
 $(LIB_DIR)/libballotbrain.a: $(LIBBALLOTBRAIN_OBJS)
 	ar rcs $@ $^
@@ -123,30 +33,7 @@ $(LIB_DIR)/libballotbrain.a: $(LIBBALLOTBRAIN_OBJS)
 $(LIB_DIR)/libballotclient.a: $(LIBBALLOTCLIENT_OBJS)
 	ar rcs $@ $^
 
-$(LIB_DIR)/libtetrisdb.a: $(LIBTETRISDB_OBJS)
-	ar rcs $@ $^
-
-$(LIB_DIR)/libtetrisutil.a: $(LIBTETRISUTIL_OBJS)
-	ar rcs $@ $^
-
-$(LIB_DIR)/libtetrisui.a: $(LIBTETRISUI_OBJS)
-	ar rcs $@ $^
-
 # === Binaries ===
-tetrish: $(wildcard src/tetrish/*.c) $(TETRISH_LIB_SRCS) $(LIBS) $(HEADERS)
-	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
-
-# Each system program is its own binary, linked with the shared lib sources.
-$(BIN_DIR)/%: src/tetrish/system_programs/%.c $(TETRISH_LIB_SRCS) $(LIB_DIR)/libtetrisutil.a $(HEADERS)
-	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) -ltetrisutil
-
-# Overrides the pattern rule above: dspawn2 and dcheck read .tetrishrc through
-# libtetrisutil's rc_get(), so they need the shared utility library.
-$(BIN_DIR)/dspawn2: src/tetrish/system_programs/dspawn2.c $(TETRISH_LIB_SRCS) $(LIB_DIR)/libtetrisutil.a $(HEADERS)
-	$(CC) $(CFLAGS) src/tetrish/system_programs/dspawn2.c $(TETRISH_LIB_SRCS) -o $@ $(LDFLAGS) -ltetrisutil
-
-$(BIN_DIR)/dcheck: src/tetrish/system_programs/dcheck.c $(TETRISH_LIB_SRCS) $(LIB_DIR)/libtetrisutil.a $(HEADERS)
-	$(CC) $(CFLAGS) src/tetrish/system_programs/dcheck.c $(TETRISH_LIB_SRCS) -o $@ $(LDFLAGS) -ltetrisutil
 
 # ballotd and bin/ballot_session are two separate programs: ballotd forks and
 # execs bin/ballot_session per voter connection (SESSION_BIN in main.c), so
@@ -158,12 +45,6 @@ $(BIN_DIR)/ballotd: src/ballotd/main.c src/ballotd/dispatch.c src/ballotd/contro
 
 $(BIN_DIR)/ballot_session: src/ballotd/session.c $(LIBS) $(HEADERS)
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
-
-$(BIN_DIR)/tetrislogd: $(wildcard src/tetrislogd/*.c) $(LIBS) $(HEADERS)
-	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
-
-$(BIN_DIR)/tetrisdb: $(wildcard src/tetrisdb/*.c) $(LIBS) $(HEADERS)
-	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
 
 # ballotctl and ballotu are the only binaries that draw, so -ltetrisui and
 # -lncurses are scoped to them rather than added to the global LDLIBS.
@@ -182,12 +63,15 @@ $(BIN_DIR)/ballotu: src/ballotu/ballotu.c $(LIBS) $(HEADERS)
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS) $(LDLIBS)
 
 # === Unit tests (Unity) ===
-UNITY_DIR   := external/2026-pa1-50005-6767/tests/unity
+UNITY_DIR   := $(SHARED_ROOT)/external/2026-pa1-50005-6767/tests/unity
 TEST_SRCS   := $(wildcard tests/unit/test_*.c)
 TEST_BINS   := $(TEST_SRCS:tests/unit/%.c=$(BIN_DIR)/%)
 TEST_CFLAGS := $(CFLAGS) -I$(UNITY_DIR) -Itests/unit/support -Itests
 
-# libballotclient reuses symbols from libballotbrain, so it must precede it.
+# The database runner, compiled into the suites that spawn a real one. It lives
+# in the shared tree with the daemon it belongs to.
+DB_RUNNER_SRC := $(SHARED_SRC)/tetrisdb/runner.c
+
 # -lhtttp is for test_codec, which exercises the wire codec directly against
 # real htttp_parse/serialize rather than through a seam.
 # -ltetrissh -lssl -lcrypto: voter.c's bu_join/bu_submit_vote reference the
@@ -201,13 +85,12 @@ TEST_CFLAGS := $(CFLAGS) -I$(UNITY_DIR) -Itests/unit/support -Itests
 # live there too) calls db_socket_* directly. No test needs to fake it (it
 # degrades to a fixed id when unreachable), but the symbols still need to
 # resolve.
-# -ltetrisutil: bc_fold_eligible (admin.c) calls libtetrisutil/playername.c's
-# -ltetrisutil: bc_fold_eligible (admin.c) calls libtetrisutil/playername.c's
-# user_name_ok/user_name_fold directly (the same fold every real
-# username goes through), so libballotclient.a now has an unresolved
-# reference into libtetrisutil.a for every test that links it - which, per the
-# note above, is all of them.
-# --start-group: same archive-ordering fragility as the top-level LDLIBS -
+# -ltetrisutil: bc_fold_eligible (admin.c) calls libtetrisutil/name.c's
+# user_name_ok/user_name_fold directly (the same fold every real username goes
+# through), so libballotclient.a has an unresolved reference into
+# libtetrisutil.a for every test that links it - which, per the note above, is
+# all of them.
+# --start-group: same archive-ordering fragility as ../shared.mk's LDLIBS -
 # see that comment. Each test defines the seams it wants to substitute;
 # because the libraries are static archives, a seam defined in the test keeps
 # the real member out of the binary (see tests/unit/support/fake_*_seams.h).
@@ -223,17 +106,17 @@ $(BIN_DIR)/test_%: tests/unit/test_%.c $(wildcard tests/unit/support/*.h) $(UNIT
 # rather than tests/unit/, so it needs an explicit rule to beat the pattern
 # rule above. It spawns a real PipeRunner child and skips those cases when
 # java or the jar is missing, so it stays runnable on a machine without a JVM.
-$(BIN_DIR)/test_db: tests/test_db.c src/tetrisdb/runner.c $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a $(HEADERS)
-	$(CC) $(CFLAGS) -Itests -Isrc $(filter %.c,$^) -o $@ $(LDFLAGS) -ltetrisdb -ltetrisutil -lpthread
+$(BIN_DIR)/test_db: tests/test_db.c $(DB_RUNNER_SRC) $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a $(HEADERS)
+	$(CC) $(CFLAGS) -Itests -I$(SHARED_SRC) $(filter %.c,$^) -o $@ $(LDFLAGS) -ltetrisdb -ltetrisutil -lpthread
 
-$(BIN_DIR)/test_auth: tests/test_auth.c src/tetrisdb/runner.c $(LIBS) $(HEADERS)
-	$(CC) $(CFLAGS) -Itests -Isrc/libtetrisauth/lib -Isrc/tetrisdb $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
+$(BIN_DIR)/test_auth: tests/test_auth.c $(DB_RUNNER_SRC) $(LIBS) $(HEADERS)
+	$(CC) $(CFLAGS) -Itests -I$(SHARED_SRC)/libtetrisauth/lib -I$(SHARED_SRC)/tetrisdb $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
 
-$(BIN_DIR)/test_jwt: tests/test_jwt.c src/libtetrisauth/lib/token.c src/libtetrisauth/lib/hex.c $(LIB_DIR)/libtetrisutil.a $(HEADERS)
-	$(CC) $(CFLAGS) -Itests -Isrc/libtetrisauth/lib $(filter %.c,$^) -o $@ $(LDFLAGS) -ltetrisutil -lcrypto
+$(BIN_DIR)/test_jwt: tests/test_jwt.c $(SHARED_SRC)/libtetrisauth/lib/token.c $(SHARED_SRC)/libtetrisauth/lib/hex.c $(LIB_DIR)/libtetrisutil.a $(HEADERS)
+	$(CC) $(CFLAGS) -Itests -I$(SHARED_SRC)/libtetrisauth/lib $(filter %.c,$^) -o $@ $(LDFLAGS) -ltetrisutil -lcrypto
 
-$(BIN_DIR)/test_rc: tests/test_rc.c src/tetrislogd/config.c $(BIN_DIR)/tetrislogd $(LIB_DIR)/libtetrisauth.a $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a $(HEADERS)
-	$(CC) $(CFLAGS) -Itests -Isrc/libtetrisauth/lib tests/test_rc.c src/tetrislogd/config.c -o $@ $(LDFLAGS) -ltetrisauth -ltetrisdb -ltetrisutil
+$(BIN_DIR)/test_rc: tests/test_rc.c $(SHARED_SRC)/tetrislogd/config.c $(BIN_DIR)/tetrislogd $(LIB_DIR)/libtetrisauth.a $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a $(HEADERS)
+	$(CC) $(CFLAGS) -Itests -I$(SHARED_SRC)/libtetrisauth/lib tests/test_rc.c $(SHARED_SRC)/tetrislogd/config.c -o $@ $(LDFLAGS) -ltetrisauth -ltetrisdb -ltetrisutil
 
 $(BIN_DIR)/test_tetrisdb: tests/test_tetrisdb.c $(BIN_DIR)/tetrisdb $(HEADERS)
 	$(CC) $(CFLAGS) tests/test_tetrisdb.c -o $@ -lpthread
@@ -248,18 +131,18 @@ $(BIN_DIR)/test_logd: tests/test_logd.c $(LIB_DIR)/libtetrisutil.a $(BIN_DIR)/te
 # prerequisites rather than just runtime assumptions (same story as
 # test_logd needing bin/tetrislogd). Needs libtetrissh/libhtttp/libballot*
 # directly for the client-side handshake and codec calls the test makes.
-$(BIN_DIR)/test_ballotd: tests/test_ballotd.c src/tetrisdb/runner.c $(LIB_DIR)/libtetrissh.a $(LIB_DIR)/libhtttp.a $(LIB_DIR)/libballotclient.a $(LIB_DIR)/libballotbrain.a $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a $(BIN_DIR)/ballotd $(BIN_DIR)/ballot_session $(HEADERS)
-	$(CC) $(CFLAGS) -Isrc $(filter %.c,$^) -o $@ $(LDFLAGS) -lballotclient -lballotbrain -ltetrissh -lhtttp -ltetrisdb -ltetrisutil -lssl -lcrypto -lpthread
+$(BIN_DIR)/test_ballotd: tests/test_ballotd.c $(DB_RUNNER_SRC) $(LIB_DIR)/libtetrissh.a $(LIB_DIR)/libhtttp.a $(LIB_DIR)/libballotclient.a $(LIB_DIR)/libballotbrain.a $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a $(BIN_DIR)/ballotd $(BIN_DIR)/ballot_session $(HEADERS)
+	$(CC) $(CFLAGS) -I$(SHARED_SRC) $(filter %.c,$^) -o $@ $(LDFLAGS) -lballotclient -lballotbrain -ltetrissh -lhtttp -ltetrisdb -ltetrisutil -lssl -lcrypto -lpthread
 
 # Real-process E2E for the client side of the same picture: drives the real
 # bcl_connect/bu_join/bcl_send (src/libballotclient/transport.c) - the same
 # calls ballotu.c makes - against a real bin/ballotd, rather than a
 # hand-rolled socket harness like test_ballotd.c's.
-$(BIN_DIR)/test_client_transport: tests/test_client_transport.c src/tetrisdb/runner.c $(LIB_DIR)/libtetrissh.a $(LIB_DIR)/libhtttp.a $(LIB_DIR)/libballotclient.a $(LIB_DIR)/libballotbrain.a $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a $(BIN_DIR)/ballotd $(BIN_DIR)/ballot_session $(HEADERS)
-	$(CC) $(CFLAGS) -Isrc $(filter %.c,$^) -o $@ $(LDFLAGS) -lballotclient -lballotbrain -ltetrissh -lhtttp -ltetrisdb -ltetrisutil -lssl -lcrypto -lpthread
+$(BIN_DIR)/test_client_transport: tests/test_client_transport.c $(DB_RUNNER_SRC) $(LIB_DIR)/libtetrissh.a $(LIB_DIR)/libhtttp.a $(LIB_DIR)/libballotclient.a $(LIB_DIR)/libballotbrain.a $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a $(BIN_DIR)/ballotd $(BIN_DIR)/ballot_session $(HEADERS)
+	$(CC) $(CFLAGS) -I$(SHARED_SRC) $(filter %.c,$^) -o $@ $(LDFLAGS) -lballotclient -lballotbrain -ltetrissh -lhtttp -ltetrisdb -ltetrisutil -lssl -lcrypto -lpthread
 
-$(BIN_DIR)/test_system_e2e: tests/test_system_e2e.c src/tetrisdb/runner.c $(LIB_DIR)/libtetrissh.a $(LIB_DIR)/libhtttp.a $(LIB_DIR)/libballotclient.a $(LIB_DIR)/libballotbrain.a $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a $(BIN_DIR)/ballotd $(BIN_DIR)/ballot_session $(BIN_DIR)/tetrisdb $(HEADERS)
-	$(CC) $(CFLAGS) -Isrc $(filter %.c,$^) -o $@ $(LDFLAGS) -lballotclient -lballotbrain -ltetrissh -lhtttp -ltetrisdb -ltetrisutil -lssl -lcrypto -lpthread
+$(BIN_DIR)/test_system_e2e: tests/test_system_e2e.c $(DB_RUNNER_SRC) $(LIB_DIR)/libtetrissh.a $(LIB_DIR)/libhtttp.a $(LIB_DIR)/libballotclient.a $(LIB_DIR)/libballotbrain.a $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a $(BIN_DIR)/ballotd $(BIN_DIR)/ballot_session $(BIN_DIR)/tetrisdb $(HEADERS)
+	$(CC) $(CFLAGS) -I$(SHARED_SRC) $(filter %.c,$^) -o $@ $(LDFLAGS) -lballotclient -lballotbrain -ltetrissh -lhtttp -ltetrisdb -ltetrisutil -lssl -lcrypto -lpthread
 
 .PHONY: test
 test: dirs $(LIB_DIR)/libballotbrain.a $(LIB_DIR)/libballotclient.a $(TEST_BINS) $(BIN_DIR)/test_db $(BIN_DIR)/test_logd $(BIN_DIR)/test_auth $(BIN_DIR)/test_jwt $(BIN_DIR)/test_tetrisdb $(BIN_DIR)/test_ballotd $(BIN_DIR)/test_client_transport
@@ -326,7 +209,7 @@ endif
 # the function that actually broke rather than its caller.
 # -fno-sanitize-recover=undefined: UBSan defaults to printing and CONTINUING,
 # which would let the fuzzer sail past the very bug it just found.
-FUZZ_CFLAGS = -g -O1 -Wall -Wextra -Iinclude -I$(FUZZ_DIR) \
+FUZZ_CFLAGS = -g -O1 -Wall -Wextra -Iinclude -I$(SHARED_INC) -I$(FUZZ_DIR) \
               -fsanitize=$(FUZZ_SAN) \
               -fno-sanitize-recover=undefined -fno-omit-frame-pointer \
               -fprofile-instr-generate -fcoverage-mapping
@@ -334,7 +217,7 @@ FUZZ_CFLAGS = -g -O1 -Wall -Wextra -Iinclude -I$(FUZZ_DIR) \
 # The replay half: Apple's clang, working ASan, no libFuzzer. Same harnesses,
 # same sources under test, a plain main() from replay_main.c instead of the
 # mutation engine.
-REPLAY_CFLAGS := -g -O1 -Wall -Wextra -Iinclude -I$(FUZZ_DIR) \
+REPLAY_CFLAGS := -g -O1 -Wall -Wextra -Iinclude -I$(SHARED_INC) -I$(FUZZ_DIR) \
                  -fsanitize=address,undefined -fno-sanitize-recover=undefined \
                  -fno-omit-frame-pointer
 
@@ -345,15 +228,17 @@ REPLAY_BINS := $(FUZZ_SRCS:$(FUZZ_DIR)/fuzz_%.c=$(BIN_DIR)/replay_%)
 # Sources under test, per target. Compiled FROM SOURCE rather than linked out
 # of lib/*.a because only instrumented code gives the fuzzer coverage feedback
 # to steer by - an uninstrumented archive would leave it mutating blind.
-FUZZ_UNDER_TEST_fuzz_htttp_request  := src/libhtttp/htttp.c
-FUZZ_UNDER_TEST_fuzz_htttp_response := src/libhtttp/htttp.c
-FUZZ_UNDER_TEST_fuzz_codec_request  := src/libballotclient/codec.c src/libhtttp/htttp.c
-FUZZ_UNDER_TEST_fuzz_codec_response := src/libballotclient/codec.c src/libhtttp/htttp.c
-FUZZ_UNDER_TEST_fuzz_jwt_verify     := src/libtetrisauth/jwt.c
-FUZZ_UNDER_TEST_fuzz_rows           := src/libtetrisdb/socket/rows.c
-FUZZ_UNDER_TEST_fuzz_rc_line        := src/libtetrisutil/rc.c
-FUZZ_UNDER_TEST_fuzz_rc_bind        := src/libtetrisutil/rc.c
-FUZZ_UNDER_TEST_fuzz_playername     := src/libtetrisutil/name.c
+# Most of these now live in the shared tree under ../core/src; the codec is
+# ballotbox's own.
+FUZZ_UNDER_TEST_fuzz_htttp_request  := $(SHARED_SRC)/libhtttp/htttp.c
+FUZZ_UNDER_TEST_fuzz_htttp_response := $(SHARED_SRC)/libhtttp/htttp.c
+FUZZ_UNDER_TEST_fuzz_codec_request  := src/libballotclient/codec.c $(SHARED_SRC)/libhtttp/htttp.c
+FUZZ_UNDER_TEST_fuzz_codec_response := src/libballotclient/codec.c $(SHARED_SRC)/libhtttp/htttp.c
+FUZZ_UNDER_TEST_fuzz_jwt_verify     := $(SHARED_SRC)/libtetrisauth/jwt.c
+FUZZ_UNDER_TEST_fuzz_rows           := $(SHARED_SRC)/libtetrisdb/socket/rows.c
+FUZZ_UNDER_TEST_fuzz_rc_line        := $(SHARED_SRC)/libtetrisutil/rc.c
+FUZZ_UNDER_TEST_fuzz_rc_bind        := $(SHARED_SRC)/libtetrisutil/rc.c
+FUZZ_UNDER_TEST_fuzz_playername     := $(SHARED_SRC)/libtetrisutil/name.c
 # ctl_frame.h is header-only (static inline both ends share), so the harness
 # IS the translation unit under test.
 FUZZ_UNDER_TEST_fuzz_ctl_frame      :=
@@ -374,20 +259,22 @@ FUZZ_SSL_CFLAGS  := -I$(OPENSSL)/include
 FUZZ_SSL_LDFLAGS := -L$(OPENSSL)/lib
 endif
 
-# Every source under src/, as a prerequisite - the same coarse rule $(HEADERS)
-# follows above, and for a sharper reason here. A fuzz binary compiles its
-# code under test IN, so a fix to codec.c that make does not notice leaves a
-# binary that still reproduces the bug that was just fixed, which reads as
-# "the fix did not work" rather than as a stale build.
+# Every source a fuzz binary might compile in, as a prerequisite - the same
+# coarse rule $(HEADERS) follows above, and for a sharper reason here. A fuzz
+# binary compiles its code under test IN, so a fix to codec.c that make does
+# not notice leaves a binary that still reproduces the bug that was just fixed,
+# which reads as "the fix did not work" rather than as a stale build. The
+# shared tree is swept too: most of the targets above are parsers that live
+# there.
 #
 # The Makefile is a prerequisite too: which sanitizers a fuzz binary carries is
 # decided HERE, not in the source, so changing FUZZ_SAN with no source edit
 # would otherwise leave every stale binary in place - and a stale ASan build on
 # macOS does not fail, it hangs, which reads as a slow fuzzer rather than as a
 # build that should have been redone.
-FUZZ_ALL_SRCS := $(shell find src -name '*.c' 2>/dev/null)
+FUZZ_ALL_SRCS := $(shell find src $(SHARED_SRC) -name '*.c' 2>/dev/null)
 
-$(BIN_DIR)/fuzz_%: $(FUZZ_DIR)/fuzz_%.c $(FUZZ_DIR)/fuzz_support.h $(HEADERS) $(FUZZ_ALL_SRCS) Makefile
+$(BIN_DIR)/fuzz_%: $(FUZZ_DIR)/fuzz_%.c $(FUZZ_DIR)/fuzz_support.h $(HEADERS) $(FUZZ_ALL_SRCS) Makefile ../shared.mk
 	@mkdir -p $(BIN_DIR)
 	@test -x "$(FUZZ_CC)" || { \
 	  echo "fuzzing needs Homebrew LLVM (Apple clang has no libFuzzer runtime):"; \
@@ -395,7 +282,7 @@ $(BIN_DIR)/fuzz_%: $(FUZZ_DIR)/fuzz_%.c $(FUZZ_DIR)/fuzz_support.h $(HEADERS) $(
 	$(FUZZ_CC) $(FUZZ_CFLAGS) $(FUZZ_SSL_CFLAGS) $< \
 	  $(FUZZ_UNDER_TEST_fuzz_$*) -o $@ $(FUZZ_SSL_LDFLAGS) $(FUZZ_LDLIBS_fuzz_$*)
 
-$(BIN_DIR)/replay_%: $(FUZZ_DIR)/fuzz_%.c $(FUZZ_DIR)/replay_main.c $(FUZZ_DIR)/fuzz_support.h $(HEADERS) $(FUZZ_ALL_SRCS) Makefile
+$(BIN_DIR)/replay_%: $(FUZZ_DIR)/fuzz_%.c $(FUZZ_DIR)/replay_main.c $(FUZZ_DIR)/fuzz_support.h $(HEADERS) $(FUZZ_ALL_SRCS) Makefile ../shared.mk
 	@mkdir -p $(BIN_DIR)
 	$(CC) $(REPLAY_CFLAGS) $(FUZZ_SSL_CFLAGS) $< $(FUZZ_DIR)/replay_main.c \
 	  $(FUZZ_UNDER_TEST_fuzz_$*) -o $@ $(FUZZ_SSL_LDFLAGS) $(FUZZ_LDLIBS_fuzz_$*)
@@ -409,9 +296,9 @@ replay-build: $(REPLAY_BINS)
 # The JWT corpus cannot be written by a shell script: a valid HS256 token is
 # not something a mutator (or a printf) will ever produce, and without one the
 # target never gets past "not three segments" into the claim logic.
-$(BIN_DIR)/seedgen_jwt: $(FUZZ_DIR)/seedgen_jwt.c src/libtetrisauth/jwt.c $(HEADERS)
+$(BIN_DIR)/seedgen_jwt: $(FUZZ_DIR)/seedgen_jwt.c $(SHARED_SRC)/libtetrisauth/jwt.c $(HEADERS)
 	@mkdir -p $(BIN_DIR)
-	$(CC) $(CFLAGS) -I$(FUZZ_DIR) $(FUZZ_DIR)/seedgen_jwt.c src/libtetrisauth/jwt.c \
+	$(CC) $(CFLAGS) -I$(FUZZ_DIR) $(FUZZ_DIR)/seedgen_jwt.c $(SHARED_SRC)/libtetrisauth/jwt.c \
 	  -o $@ $(LDFLAGS) -lcrypto
 
 .PHONY: fuzz-seed
@@ -543,6 +430,3 @@ start:
 	$(MAKE) clean
 	$(MAKE) all
 	./tetrish
-
-clean:
-	rm -rf $(BIN_DIR)/* $(LIB_DIR)/*.a src/*/*.o src/*/*/*.o

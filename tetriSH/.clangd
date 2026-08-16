@@ -1,2 +1,5 @@
 CompileFlags:
-  Add: [-Iinclude, -Iincludes, -Wall, -Wextra]
+  # -Iinclude first, then the shared core - same order as CFLAGS in
+  # ../shared.mk, so clangd resolves tetrisdb/provision.h to this project's
+  # copy exactly the way the compiler does.
+  Add: [-Iinclude, -I../core/include, -Wall, -Wextra]

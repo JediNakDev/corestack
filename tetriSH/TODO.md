@@ -2,13 +2,13 @@
 
 ## 1. Deliverables (binaries and libraries)
 
-- [x] `tetrish` - interactive shell (`src/tetrish/`)
+- [x] `tetrish` - interactive shell (`core/src/tetrish/`)
 - [x] `tetrisd` - game daemon (`src/tetrisd/`)
-- [x] `tetrislogd` - logger daemon (`src/tetrislogd/`)
+- [x] `tetrislogd` - logger daemon (`core/src/tetrislogd/`)
 - [x] `tetrisctl` - admin CLI (`src/tetrisctl/`)
 - [x] `tetrisu` - terminal game client (`src/tetrisu/`)
-- [x] `libtetrissh` - secure session (`src/libtetrissh/`)
-- [x] `libhtttp` - protocol parser/serialiser (`src/libhtttp/`)
+- [x] `libtetrissh` - secure session (`core/src/libtetrissh/`)
+- [x] `libhtttp` - protocol parser/serialiser (`core/src/libhtttp/`)
 - [x] `libtetrisbrain` - game logic (`src/libtetrisbrain/`)
 - [x] All three libraries statically linked (`lib/*.a`)
 - [ ] Confirm the extra libraries (`libtetrisauth`, `libtetrisdb`, `libtetrisui`, `libtetrisutil`) are justified in the README as CoreStack shared core, not scope creep
@@ -18,7 +18,7 @@
 - [x] REPL, `fork()` + `execvp()`
 - [x] Builtins: `cd`, `help`, `exit`, `usage`, `env`, `setenv`, `unsetenv`
 - [x] `.tetrishrc` executed on startup
-- [x] Background spawning/tracking: `sys`, `dspawn`, `dcheck` (`src/tetrish/system_programs/`)
+- [x] Background spawning/tracking: `sys`, `dspawn`, `dcheck` (`core/src/tetrish/system_programs/`)
 - [x] Fuzz the REPL with bad input (empty line, only spaces, 4KB line, unmatched quotes, `&` alone, missing binary) and confirm no crash (`tests/test_shell.c`, in `make test` and `make test-ci`)
 
 ## 3. `tetrisd` (game daemon)
@@ -35,7 +35,7 @@
 - [x] Ignores `SIGPIPE` (`tetrisd.c:541`, `session.c:513`)
 - [x] Confirm broken connections are detected via `write()` returning `EPIPE` and the session is torn down
 - [x] Forwards all log records to `tetrislogd` over IPC - `tetrisd` and `bin/session` are both senders now (`log_open_configured()` at the top of `main`, `atexit(log_close)`), each sending one `init` record, and the login path's `libtetrisauth` records now arrive. Still to come: the per-connection, per-request and per-room records. See the audit note in §11 and follow [INTEGRATION.md](INTEGRATION.md)
-- [x] **Verify the enqueue from game-critical paths is genuinely non-blocking** and drops rather than stalls - `log_send()` cannot block: non-blocking socket, drop-and-count on failure (`drop_one()`, `src/libtetrisutil/logmsg.c`). The drops are not silent either - they ride the next delivered record and surface in `tetrislogd`'s periodic summary (§4)
+- [x] **Verify the enqueue from game-critical paths is genuinely non-blocking** and drops rather than stalls - `log_send()` cannot block: non-blocking socket, drop-and-count on failure (`drop_one()`, `core/src/libtetrisutil/logmsg.c`). The drops are not silent either - they ride the next delivered record and surface in `tetrislogd`'s periodic summary (§4)
 - [x] Control plane exposed to `tetrisctl` (`src/tetrisctl/control_plane.c`)
 - [x] Document the chosen process/thread model (listener thread + `fork()`-per-session + admin thread + ctl thread) against the three reference designs, with the tradeoff argued
 
@@ -45,7 +45,7 @@
 - [x] Receives log records over IPC (Unix datagram socket, `log_ipc`)
 - [x] Writes to `log_path` from `.tetrishrc`
 - [x] Dropped-records counter - senders piggyback their drop count on the next delivered record (`log_msg_t.dropped`); `tetrislogd` sums it into `logd_stats_t.dropped` and reports it in the shutdown banner
-- [x] **Periodic summary line** (`dropped 47 records in last 30s`) - `summarise()` in `src/tetrislogd/sink.c`, driven by an `SO_RCVTIMEO` tick so it fires on the clock even when no record arrives. Window is `log_summary_secs` (default 30); a window that lost nothing prints nothing. Test: `tests/test_logd.c`, "periodic drop summary"
+- [x] **Periodic summary line** (`dropped 47 records in last 30s`) - `summarise()` in `core/src/tetrislogd/sink.c`, driven by an `SO_RCVTIMEO` tick so it fires on the clock even when no record arrives. Window is `log_summary_secs` (default 30); a window that lost nothing prints nothing. Test: `tests/test_logd.c`, "periodic drop summary"
 - [x] `SIGTERM` - flush, close, exit
 - [x] `SIGHUP` - reopen log file for rotation
 - [x] **Survive a** `tetrisd` **restart** - `tests/test_logd.c`, "survives peer restart": SIGKILLs one sender mid-life, then serves a second from the same untouched daemon (asserted by the absence of a second startup banner)
@@ -96,7 +96,7 @@
 - [x] `Player-Id` header used
 - [ ] `Content-Type: application/tetris-command` **on client requests with a body** - only `application/json` appears in the tree
 - [ ] `Content-Type: application/tetris-state` **on server state broadcasts** - same
-- [ ] **Method/path conformance to the fixed table.** The handout fixes: `JOIN|LEAVE|START /room/<id>`, `MOVE|ROTATE|DROP /room/<id>/player/<pid>`, `STATE /room/<id>`. The implementation uses `/game/move`, `/game/rotate`, `/game/drop`, and `UPD_GAME /game/state` instead of `STATE` (`include/libhtttp/htttp.md`). Either bring paths and the `STATE` method into line, or be ready to defend the deviation - the handout calls this section fixed, so aligning is the safe call.
+- [ ] **Method/path conformance to the fixed table.** The handout fixes: `JOIN|LEAVE|START /room/<id>`, `MOVE|ROTATE|DROP /room/<id>/player/<pid>`, `STATE /room/<id>`. The implementation uses `/game/move`, `/game/rotate`, `/game/drop`, and `UPD_GAME /game/state` instead of `STATE` (`core/include/libhtttp/htttp.md`). Either bring paths and the `STATE` method into line, or be ready to defend the deviation - the handout calls this section fixed, so aligning is the safe call.
 - [ ] `MOVE` **body must be** `LEFT`**/**`RIGHT`**,** `ROTATE` **body** `CW`**/**`CCW`**,** `DROP` **body** `SOFT`**/**`HARD` - currently `"0"|"1"` in the body
 - [ ] Status codes reachable: `200` [x], `400` [x], `403` [x], `404` [x], `409` [x], `500` [x]
 - [ ] `201` **reachable** (room created by `JOIN` is the natural site)
@@ -127,7 +127,7 @@
 ## 11. Logging (cross-cutting)
 
 - [x] **All logging performed by** `tetrislogd`**; other binaries forward over IPC** - `tetrisd`, `bin/session` and `tetrisctl` all forward over the datagram channel; `tetrisu` is excluded by decision, not omission. Was ticked before anything checked it, and is now true
-- [x] **Game-critical threads must never block on the logger** - guaranteed by the library, not by call-site discipline: the socket is `O_NONBLOCK` from `sender_connect()` and the drop decision is `drop_one()` in `src/libtetrisutil/logmsg.c`, reached the moment a non-blocking `send()` fails. There is no code path from `log_send()` into a blocking call, so this holds for every future call site by construction. Proven end to end by `tests/test_logd.c`, "burst never blocks sender"
+- [x] **Game-critical threads must never block on the logger** - guaranteed by the library, not by call-site discipline: the socket is `O_NONBLOCK` from `sender_connect()` and the drop decision is `drop_one()` in `core/src/libtetrisutil/logmsg.c`, reached the moment a non-blocking `send()` fails. There is no code path from `log_send()` into a blocking call, so this holds for every future call site by construction. Proven end to end by `tests/test_logd.c`, "burst never blocks sender"
 - [x] Drop count observable - locally via `log_dropped()`, and centrally: every record carries the sender's outstanding drop count, which `tetrislogd` totals and reports on a timer (§4)
 - [x] **Log with timestamp: every connection event, secure-session establishment, HTTTP request and response, room state change, and admin action.** None of the five yet - the only record any server binary sends today is `tetrisd`'s one-line `"tetrisd init"`, which proves the wiring, not a category. The daemon timestamps whatever it receives, so this is entirely about adding the sends; per-category sites and levels are tabulated in [INTEGRATION.md](INTEGRATION.md), "What `tetrisd` must log"
 - [x] Decide and document whether `tetrisctl` and `tetrisu` also log to `tetrislogd` - `tetrisctl` **yes,** `tetrisu` **no.** Admin actions are one of the five required categories and `tetrisctl` is where they enter the system, so it is wired as a sender (the records themselves are still to be written). `tetrisu` is the untrusted client: its records would be a player's claims about a player's machine, and the server already logs everything the client causes. Recorded in the audit note above and in the README

@@ -17,7 +17,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "../src/tetrish/shell.h"
+#include "../../core/src/tetrish/shell.h"
 
 #define SHELL_BIN "./tetrish"
 #define OUT_CAP 65536

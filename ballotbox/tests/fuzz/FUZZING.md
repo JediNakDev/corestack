@@ -56,15 +56,15 @@ how much fixed-size copying it does with it.
 
 | Target | Code under test | Why it is on the list |
 | --- | --- | --- |
-| `fuzz_htttp_request` | `src/libhtttp/htttp.c` | Every decrypted frame from any peer hits this first, before anything has decided the peer is honest. Fills five fixed-size fields from wire bytes. |
+| `fuzz_htttp_request` | `core/src/libhtttp/htttp.c` | Every decrypted frame from any peer hits this first, before anything has decided the peer is honest. Fills five fixed-size fields from wire bytes. |
 | `fuzz_htttp_response` | same | The mirror. Requests flow both directions in HTTTP, so both parsers run on both ends; the status line is code the request target never reaches. |
 | `fuzz_codec_request` | `codec.c` + `htttp.c` | The real daemon path: bytes → `htttp_parse_request` → `bcl_decode_request`, exactly what `ballotd` does before any eligibility or lifecycle check. |
 | `fuzz_codec_response` | same | The client path. `bcl_decode_response` takes no op, so it will populate any combination of keys — which is what a hostile daemon would send. |
-| `fuzz_jwt_verify` | `src/libtetrisauth/jwt.c` | Hand-written base64url and JSON walking on a token the caller fully controls, with an auth decision on the other side. |
-| `fuzz_rows` | `src/libtetrisdb/socket/rows.c` | Parses SimpleDB's printed output, narration and all. Every credential check reads its salt and digest through it. |
-| `fuzz_rc_line` | `src/libtetrisutil/rc.c` | Decides whether a line of `.tetrishrc` is a comment or **a command the shell will run**. |
+| `fuzz_jwt_verify` | `core/src/libtetrisauth/jwt.c` | Hand-written base64url and JSON walking on a token the caller fully controls, with an auth decision on the other side. |
+| `fuzz_rows` | `core/src/libtetrisdb/socket/rows.c` | Parses SimpleDB's printed output, narration and all. Every credential check reads its salt and digest through it. |
+| `fuzz_rc_line` | `core/src/libtetrisutil/rc.c` | Decides whether a line of `.tetrishrc` is a comment or **a command the shell will run**. |
 | `fuzz_rc_bind` | same | The typed key table three libraries share: bounds, fixed-buffer copies, defect reporting. |
-| `fuzz_playername` | `src/libtetrisutil/playername.c` | The allowlist that lets `tdb_quote`, the credential body split, and the select-reply parser each skip an escaping step. |
+| `fuzz_playername` | `core/src/libtetrisutil/playername.c` | The allowlist that lets `tdb_quote`, the credential body split, and the select-reply parser each skip an escaping step. |
 | `fuzz_ctl_frame` | `include/libballotclient/ctl_frame.h` | 4-byte length prefix, attacker-chosen, read into a fixed buffer. Driven over a real socketpair so short reads and torn frames actually happen. |
 
 Not yet covered, in rough priority order: `session_recv` (libtetrissh's framing,

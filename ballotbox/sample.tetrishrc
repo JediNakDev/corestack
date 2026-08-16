@@ -1,29 +1,49 @@
 PATH = PATH_TO_THIS_PROGRAM/bin:/usr/bin:/bin
 
+# bin/ballotd: listener, TLS material and the control socket bin/ballotctl
+# attaches to. The port matches DEFAULT_PORT in src/ballotd/main.c, and is
+# deliberately not tetriSH's 5555 - the two daemons can run side by side.
+ballotd_port    = 7676
+ballotd_cert    = auth/server_signed.crt
+ballotd_key     = auth/private_key.pem
+ballotd_ctl_ipc = var/run/ballotd.ctl
+
+# bin/dspawn2 writes its pidfile here, bin/dcheck reads it back.
+dspawn_pid_dir = var/run
+dspawn_err_dir = var/log
+
 # log configuration (read by bin/tetrislogd, log_send/log_open)
-log_path  = var/log/tetrisd.log
+log_path  = var/log/ballotd.log
 log_ipc   = var/run/tetrislogd.sock
 log_level = debug
 log_send_attempts = 2
+log_summary_secs = 30
 
-# the shared SimpleDB runner (validated by tetrisdb start)
+# The SimpleDB runner, shared by bin/tetrisdb and bin/tetrislogd.
+#
+# `db` is the master switch for BOTH: bin/tetrisdb refuses to start without it
+# ("db flag is disabled") and bin/tetrislogd mirrors nothing without it. It is
+# spelled `db`, not `log_db` - `db` is the only key either daemon reads (see
+# core/src/tetrisdb/main.c and core/src/tetrislogd/config.c), so the `log_db`
+# line this file used to carry was read by nothing at all and left the runner
+# unstartable.
+db           = on
+log_db_dir   = var/db_log
+log_db_jar   = db/dist/simpledb.jar
+log_db_java  = java
+log_db_queue = 256
+
 db_dir      = var/db
 db_ipc      = var/run/tetrisdb.sock
 db_sessions = 16
 db_jar      = db/dist/simpledb.jar
 db_java     = java
+db_err_path = var/log/tetrisdb.err
 db_timeout  = 2000
 
 # authentication defaults used by libtetrisauth
 auth_max_attempts = 5
 auth_token_ttl    = 604800
 auth_pbkdf2_iters = 600000
-
-# SimpleDB mirroring (read by bin/tetrislogd)
-log_db       = on
-log_db_dir   = var/db_log
-log_db_jar   = db/dist/simpledb.jar
-log_db_java  = java
-log_db_queue = 256
 
 clear

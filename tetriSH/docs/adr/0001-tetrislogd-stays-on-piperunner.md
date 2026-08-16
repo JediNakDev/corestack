@@ -21,7 +21,7 @@ Two JVMs over one `catalog.txt` and one set of `.dat` files is the corruption ca
 "It already works, and migrating is churn" is not a reason, and this ADR exists so that it does not survive as one.
 
 Neither does durability, which is the reason the module header implies.
-`include/libtetrisdb/tetrisdb.h` describes closing `PipeRunner`'s stdin as "the only shutdown path that flushes dirty pages".
+`core/include/libtetrisdb/tetrisdb.h` describes closing `PipeRunner`'s stdin as "the only shutdown path that flushes dirty pages".
 That is insurance against a case `tetrislogd` does not create:
 
 - `Parser` auto-commits every statement submitted outside an explicit `BEGIN` (`db/src/java/simpledb/Parser.java:546`).

@@ -190,8 +190,8 @@ wrong one for anything a user is waiting on. The opposite contract lives in
 the same library as a separate type, `tdb_socket_t` - one connection to the
 shared `SocketRunner`, blocking, with a deadline and a readable result. If you
 need an answer rather than a best-effort write, read
-`include/libtetrisdb/socket/db.h` instead of this section; the two share the
-wire and nothing else. (`include/libtetrisdb/socket/runner.h` starts the runner
+`core/include/libtetrisdb/socket/db.h` instead of this section; the two share the
+wire and nothing else. (`core/include/libtetrisdb/socket/runner.h` starts the runner
 that path connects to, but that is `bin/tetrisdb`'s job once per machine, not
 yours.)
 
@@ -264,7 +264,7 @@ if (tdb_ensure_table(GAME_DB_DIR, GAME_DB_TABLE, GAME_DB_SCHEMA) < 0)
 
 Two headers, because creating a table and quoting a literal are not about a
 transport: they are equally true for the socket path in
-`include/libtetrisdb/socket/db.h`, so they do not live in either transport's
+`core/include/libtetrisdb/socket/db.h`, so they do not live in either transport's
 header.
 
 Idempotent: an existing table is left completely alone, including its data.
@@ -397,9 +397,9 @@ sitting:
 
 | Step                         | Where                                                    |
 | ---------------------------- | -------------------------------------------------------- |
-| options and rc keys          | `src/tetrislogd/config.c`, `include/tetrislogd/logger.h` |
-| directory default            | `DEFAULT_DB_DIR` in `src/tetrislogd/main.c`              |
-| create, start, seed the id   | `mirror_open()` in `src/tetrislogd/sink.c`               |
-| build and submit a statement | `mirror_write()` in `src/tetrislogd/sink.c`              |
-| clean shutdown and counters  | end of `logd_run()` in `src/tetrislogd/sink.c`           |
+| options and rc keys          | `core/src/tetrislogd/config.c`, `include/tetrislogd/logger.h` |
+| directory default            | `DEFAULT_DB_DIR` in `core/src/tetrislogd/main.c`              |
+| create, start, seed the id   | `mirror_open()` in `core/src/tetrislogd/sink.c`               |
+| build and submit a statement | `mirror_write()` in `core/src/tetrislogd/sink.c`              |
+| clean shutdown and counters  | end of `logd_run()` in `core/src/tetrislogd/sink.c`           |
 | tests, including injection   | `tests/test_db.c`                                        |

@@ -38,7 +38,7 @@
  * Load the server's RSA private key.
  *
  * Plain OpenSSL rather than libtetrissh's load_private_key(): that lives in
- * src/libtetrissh/common.h, which is deliberately NOT in include/ so the
+ * core/src/libtetrissh/common.h, which is deliberately NOT in include/ so the
  * OpenSSL helper surface stays private to that library. session_accept() takes
  * an EVP_PKEY* precisely so the application owns key loading.
  */
@@ -302,7 +302,7 @@ static void session_dispatch(Session *s, session_t *sh,
 {
     /* Guest -> account upgrade (LOGIN/REGISTER/GUEST, pre-auth gate already
      * passed). Ahead of the table: it owns its methods and answers them
-     * itself. See include/libtetrisauth/auth.h. */
+     * itself. See core/include/libtetrisauth/auth.h. */
     if (auth_offer(req, &s->session))
         return;
 
@@ -671,7 +671,7 @@ void session_main(int client_fd, int admin_fd)
 
     /* Pre-auth gate: owns sh until the client is an account or an accepted
      * guest. Must run before the poll loop starts - see
-     * include/libtetrisauth/auth.h ("THE SEAM"). */
+     * core/include/libtetrisauth/auth.h ("THE SEAM"). */
     if (auth_retry_handler(&sh) != AUTH_OK)
     {
         session_close(&sh);

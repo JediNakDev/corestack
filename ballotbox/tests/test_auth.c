@@ -41,7 +41,7 @@
  * needs the session auth_retry_handler() retained. Every auth_offer() case is
  * therefore in section B, and the pure rules underneath it - the body split,
  * the username allowlist, the password bounds - are asserted through the wire
- * rather than by reaching into src/libtetrisauth/auth.h, which is
+ * rather than by reaching into core/src/libtetrisauth/auth.h, which is
  * private for the same reason token.c's parsing statics are.
  *
  * ONE CASE ASSERTS A DELETED MECHANISM BY ITS ABSENCE. #48 decision 3 was

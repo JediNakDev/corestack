@@ -49,13 +49,13 @@ The README's own table already lists `.tetrishrc` as the first thing `dspawn` br
 
 This does not retire the trap, it relocates it.
 Under `dspawn2` the bare `RC_PATH` finds the right file *because the working directory happens to be the project root*, which is a property of how an operator started the process rather than of the code.
-`src/tetrislogd/main.c:107` and `src/libtetrisutil/logmsg.c:148` both open bare `RC_PATH` today, and both are correct only for as long as that holds.
+`core/src/tetrislogd/main.c:107` and `core/src/libtetrisutil/logmsg.c:148` both open bare `RC_PATH` today, and both are correct only for as long as that holds.
 
 Correctness by inherited working directory is standing constraint 1's named failure mode: it is an invariant the reader has to hold in their head, and nothing in either file states it.
 
 ## Finding 3: a missing rc file and a file with nothing to say are the same answer
 
-`rc_load()` returns `void` and documents a missing file as "not an error - fn is simply never called" ([`include/libtetrisutil/rc.h:32`](../../include/libtetrisutil/rc.h)).
+`rc_load()` returns `void` and documents a missing file as "not an error - fn is simply never called" ([`core/include/libtetrisutil/rc.h:32`](../../include/libtetrisutil/rc.h)).
 
 That is a reasonable rule for a file shared by independent readers, where most directives belong to somebody else.
 It is the wrong rule for the file's *absence*, because the caller cannot distinguish it from a file that simply carried nothing in its namespace.

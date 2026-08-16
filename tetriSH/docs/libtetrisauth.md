@@ -3,7 +3,7 @@
 Reference for the things that do not fit in a header.
 
 The design lives in the headers, not here.
-[`include/libtetrisauth/tetrisauth.h`](../include/libtetrisauth/tetrisauth.h) is the seam and the reason for it, [`jwt.h`](../include/libtetrisauth/jwt.h) is the token layer, [`provision.h`](../include/libtetrisauth/provision.h) is the schema and the secret, and [`authstatus.h`](../include/libtetrisauth/authstatus.h) is the one rule both sides of the wire implement.
+[`core/include/libtetrisauth/tetrisauth.h`](../include/libtetrisauth/tetrisauth.h) is the seam and the reason for it, [`jwt.h`](../include/libtetrisauth/jwt.h) is the token layer, [`provision.h`](../include/libtetrisauth/provision.h) is the schema and the secret, and [`authstatus.h`](../include/libtetrisauth/authstatus.h) is the one rule both sides of the wire implement.
 Read those first.
 This file carries only the five things that are genuinely tabular or cross-cutting: the status codes, the attempt rule, the `user` schema, the startup ordering and the `.tetrishrc` keys.
 
@@ -160,7 +160,7 @@ Steps 4 and 4b are libtetrisauth's; the rest is the launcher's and is recorded i
 7. Fork, `setsid`, stderr appended to `var/log/tetrisdb.err`, exec the JVM - `tdb_runner_spawn()`, which takes the already-opened stderr fd and inherits the step 1 lock into the child.
 8. Poll `connect()` until it succeeds, the child dies, or about 10 s elapse - `tdb_runner_wait()`. Report, exit 0 or 1.
 
-Steps 7 and 8 are `include/libtetrisdb/socket/runner.h`'s, not the launcher's own code.
+Steps 7 and 8 are `core/include/libtetrisdb/socket/runner.h`'s, not the launcher's own code.
 Only the mechanics moved: the lock, the catalog refusal, the semaphore, the provisioning, the socket unlink, the exit codes and the operator's report are all still `bin/tetrisdb`'s, because they are true of a tetriSH installation rather than of starting a runner.
 The reason for the split is [ADR 0001](adr/0001-tetrislogd-stays-on-piperunner.md)'s: resolving and validating the `java`/jar pair is shared with `tdb_start()`, so the version trap has one home rather than two.
 

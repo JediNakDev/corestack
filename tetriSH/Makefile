@@ -1,50 +1,37 @@
-CC      := cc
-CFLAGS  := -Wall -Wextra -Werror=unused-result -O2 -Iinclude -Itests
-LDFLAGS := -Llib
-LDLIBS  := -ltetrisauth -ltetrissh -lhtttp -ltetrisbrain -ltetrisdb -ltetrisutil -lssl -lcrypto -lpthread
-CLIENT_LDLIBS := -ltetrissh -lhtttp -ltetrisbrain -ltetrisui -ltetrisutil -lssl -lcrypto -lncurses
+# tetriSH - the multiplayer Tetris system.
+#
+# Everything this project shares with ballotbox (the six libtetris* libraries,
+# the tetrish shell, tetrisdb and tetrislogd) is built by ../shared.mk out of
+# ../core. What is left here is tetriSH's own: libtetrisbrain, tetrisd,
+# tetrisctl, tetrisu and the test suites.
 
-IS_CLANG := $(shell $(CC) -dM -E - </dev/null | grep -c __clang__)
-ifeq ($(IS_CLANG),0)
-CFLAGS += -Wno-format-truncation
-endif
+# Inputs to ../shared.mk, which reads them as it is included.
+#
+# -Itests: the suites include "test_output.h" as a bare name, and a handful of
+# them are compiled from targets that would otherwise each need the flag.
+PROJECT_LIBS      := -ltetrisbrain
+PROJECT_LIB_FILES := lib/libtetrisbrain.a
+EXTRA_CFLAGS      := -Itests
 
-# Homebrew OpenSSL, when brew is on PATH (macOS). Elsewhere - Linux, where
-# apt's libssl-dev already puts headers and libs on the compiler's and
-# linker's default search paths - this stays empty rather than injecting
-# -I/include -L/lib, which name real but irrelevant directories on most Linux
-# systems and would shadow the actual OpenSSL install with nothing.
-OPENSSL := $(shell command -v brew >/dev/null 2>&1 && brew --prefix openssl)
-ifneq ($(OPENSSL),)
-CFLAGS  += -I$(OPENSSL)/include
-LDFLAGS += -L$(OPENSSL)/lib
-endif
+include ../shared.mk
 
-BIN_DIR := bin
-# Test binaries live in bin/ alongside the programs, not in a subdirectory:
-# tests/run_all.sh's "ci" mode matches suite paths literally ("bin/test_db").
-TEST_BIN_DIR := $(BIN_DIR)
-LIB_DIR := lib
-
-HEADERS := $(shell find include src -name '*.h' 2>/dev/null)
-TEST_HEADERS := $(shell find tests -name '*.h' 2>/dev/null)
-
-LIBS := $(LIB_DIR)/libtetrisauth.a $(LIB_DIR)/libtetrissh.a $(LIB_DIR)/libhtttp.a \
-        $(LIB_DIR)/libtetrisbrain.a $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a \
-        $(LIB_DIR)/libtetrisui.a
+CLIENT_LDLIBS := -ltetrissh -lhtttp -ltetrisbrain -ltetrisui -ltetrisutil \
+                 -lssl -lcrypto -lncurses
 
 CLIENT_LIBS := $(LIB_DIR)/libtetrissh.a $(LIB_DIR)/libhtttp.a \
                $(LIB_DIR)/libtetrisbrain.a $(LIB_DIR)/libtetrisutil.a \
                $(LIB_DIR)/libtetrisui.a
 
-# tetrish system programs (sys, ...) compiled as standalone binaries, PA1-style.
-TETRISH_LIB_SRCS := $(wildcard src/tetrish/lib/*.c)
-SYSPROG_SRCS     := $(wildcard src/tetrish/system_programs/*.c)
-SYSPROG_BINS     := $(SYSPROG_SRCS:src/tetrish/system_programs/%.c=$(BIN_DIR)/%)
+# Test binaries live in bin/ alongside the programs, not in a subdirectory:
+# tests/run_all.sh's "ci" mode matches suite paths literally ("bin/test_db").
+TEST_BIN_DIR := $(BIN_DIR)
 
-BINS := tetrish $(BIN_DIR)/tetrisd $(BIN_DIR)/session $(BIN_DIR)/tetrislogd $(BIN_DIR)/tetrisctl $(BIN_DIR)/tetrisdb $(BIN_DIR)/tetrisu $(SYSPROG_BINS)
+TEST_HEADERS := $(shell find tests -name '*.h' 2>/dev/null)
 
-.PHONY: all client client-start clean dirs java rc secret start
+BINS := $(SHARED_BINS) $(BIN_DIR)/tetrisd $(BIN_DIR)/session \
+        $(BIN_DIR)/tetrisctl $(BIN_DIR)/tetrisu
+
+.PHONY: all client client-start start
 all: dirs rc secret java $(LIBS) $(BINS)
 
 start: clean all
@@ -55,102 +42,20 @@ client: dirs rc tetrish $(BIN_DIR)/tetrisu
 client-start: clean client
 	./tetrish
 
-java:
-	@if [ -n "$$JAVA_HOME" ] && [ ! -x "$$JAVA_HOME/bin/javac" ]; then \
-		echo "ignoring JAVA_HOME without javac: $$JAVA_HOME"; \
-		unset JAVA_HOME; \
-	fi; \
-	ant -f db/build.xml
-
-dirs:
-	@mkdir -p $(BIN_DIR) $(TEST_BIN_DIR) $(LIB_DIR) var/log var/run
-
-secret:
-	@[ -f auth/jwt_secret ] || { mkdir -p auth && umask 077 && \
-	  openssl rand -out auth/jwt_secret.tmp 32 && \
-	  chmod 600 auth/jwt_secret.tmp && \
-	  mv auth/jwt_secret.tmp auth/jwt_secret && \
-	  echo "generated auth/jwt_secret (32 bytes, mode 0600)"; }
-
-RC_ROOT := $(subst |,\|,$(subst &,\&,$(subst \,\\,$(CURDIR))))
-
-rc:
-	@[ -f .tetrishrc ] || { sed 's|PATH_TO_THIS_PROGRAM|$(RC_ROOT)|g' \
-	  sample.tetrishrc > .tetrishrc.tmp && mv .tetrishrc.tmp .tetrishrc && \
-	  echo "installed .tetrishrc from sample.tetrishrc (PATH -> $(CURDIR))"; } \
-	  || { rm -f .tetrishrc.tmp; exit 1; }
-
 # === Libraries ===
 
-LIBTETRISAUTH_SRCS  := $(wildcard src/libtetrisauth/*.c) \
-                       $(wildcard src/libtetrisauth/lib/*.c)
-LIBTETRISSH_SRCS    := $(wildcard src/libtetrissh/*.c)
-LIBHTTTP_SRCS       := $(wildcard src/libhtttp/*.c)
 LIBTETRISBRAIN_SRCS := $(wildcard src/libtetrisbrain/*.c)
-LIBTETRISDB_SRCS    := $(wildcard src/libtetrisdb/*.c) \
-                       $(wildcard src/libtetrisdb/pipe/*.c) \
-                       $(wildcard src/libtetrisdb/socket/*.c)
-LIBTETRISUTIL_SRCS      := $(wildcard src/libtetrisutil/*.c)
-LIBTETRISUI_SRCS         := $(wildcard src/libtetrisui/*.c)
-
-LIBTETRISAUTH_OBJS  := $(LIBTETRISAUTH_SRCS:.c=.o)
-LIBTETRISSH_OBJS    := $(LIBTETRISSH_SRCS:.c=.o)
-LIBHTTTP_OBJS       := $(LIBHTTTP_SRCS:.c=.o)
-LIBTETRISBRAIN_OBJS := $(LIBTETRISBRAIN_SRCS:.c=.o)
-LIBTETRISDB_OBJS    := $(LIBTETRISDB_SRCS:.c=.o)
-LIBTETRISUTIL_OBJS      := $(LIBTETRISUTIL_SRCS:.c=.o)
-LIBTETRISUI_OBJS         := $(LIBTETRISUI_SRCS:.c=.o)
-
-# Pattern rule: compile .c -> .o
-%.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(LIB_DIR)/libtetrisauth.a: $(LIBTETRISAUTH_OBJS)
-	ar rcs $@ $^
-
-$(LIB_DIR)/libtetrissh.a: $(LIBTETRISSH_OBJS)
-	ar rcs $@ $^
-
-$(LIB_DIR)/libhtttp.a: $(LIBHTTTP_OBJS)
-	ar rcs $@ $^
+LIBTETRISBRAIN_OBJS := $(call local_objs,$(LIBTETRISBRAIN_SRCS))
 
 $(LIB_DIR)/libtetrisbrain.a: $(LIBTETRISBRAIN_OBJS)
 	ar rcs $@ $^
 
-$(LIB_DIR)/libtetrisdb.a: $(LIBTETRISDB_OBJS)
-	ar rcs $@ $^
-
-$(LIB_DIR)/libtetrisutil.a: $(LIBTETRISUTIL_OBJS)
-	ar rcs $@ $^
-
-$(LIB_DIR)/libtetrisui.a: $(LIBTETRISUI_OBJS)
-	ar rcs $@ $^
-
 # === Binaries ===
-tetrish: $(wildcard src/tetrish/*.c) $(TETRISH_LIB_SRCS) $(HEADERS)
-	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@
-
-$(BIN_DIR)/%: src/tetrish/system_programs/%.c $(TETRISH_LIB_SRCS) $(HEADERS)
-	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@
-
-# Overrides the pattern rule above: dspawn2 and dcheck are the two system
-# programs that read .tetrishrc's dspawn_pid_dir through libtetrisutil/rc.h's
-# rc_get() (dspawn2 to write its pidfile, dcheck to find it), so both need
-# -ltetrisutil where every other system program is self-contained in
-# TETRISH_LIB_SRCS.
-$(BIN_DIR)/dspawn2: src/tetrish/system_programs/dspawn2.c $(TETRISH_LIB_SRCS) $(LIB_DIR)/libtetrisutil.a $(HEADERS)
-	$(CC) $(CFLAGS) src/tetrish/system_programs/dspawn2.c $(TETRISH_LIB_SRCS) -o $@ $(LDFLAGS) -ltetrisutil
-
-$(BIN_DIR)/dcheck: src/tetrish/system_programs/dcheck.c $(TETRISH_LIB_SRCS) $(LIB_DIR)/libtetrisutil.a $(HEADERS)
-	$(CC) $(CFLAGS) src/tetrish/system_programs/dcheck.c $(TETRISH_LIB_SRCS) -o $@ $(LDFLAGS) -ltetrisutil
 
 $(BIN_DIR)/tetrisd: src/tetrisd/tetrisd.c src/tetrisd/room.c src/tetrisctl/control_plane.c $(LIBS) $(HEADERS)
 	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
 
 $(BIN_DIR)/session: src/tetrisd/session.c src/tetrisd/history.c $(LIBS) $(HEADERS)
-	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
-
-$(BIN_DIR)/tetrislogd: $(wildcard src/tetrislogd/*.c) $(LIBS) $(HEADERS)
 	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
 
 # Listed rather than wildcarded: src/tetrisctl also holds control_plane.c, the
@@ -168,21 +73,21 @@ $(BIN_DIR)/tetrisctl: src/tetrisctl/tetrisctl.c src/tetrisctl/ctl_client.c \
                       $(LIBS) $(HEADERS)
 	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
 
-$(BIN_DIR)/tetrisdb: $(wildcard src/tetrisdb/*.c) $(LIBS) $(HEADERS)
-	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
-
-
 $(BIN_DIR)/tetrisu: $(wildcard src/tetrisu/*.c) $(CLIENT_LIBS) $(HEADERS)
 	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) $(CLIENT_LDLIBS)
 
-clean:
-	rm -rf tetrish $(BIN_DIR)/* $(LIB_DIR)/*.a src/*/*.o src/*/*/*.o
 # === Tests ===
 #
 # Every suite is a standalone binary in bin/, named test_*. tests/run_all.sh
 # runs a list of them and aggregates their per-case summary lines; its "ci"
 # mode matches suite paths literally ("bin/test_db", ...), which is why the
 # test binaries sit directly in bin/ rather than in a subdirectory.
+#
+# Suites that reach into the shared tree name it through $(SHARED_SRC): the
+# database runner, tetrislogd's config parser and libtetrisauth's internals all
+# live under ../core/src now, not under this project's src/.
+
+DB_RUNNER_SRC := $(SHARED_SRC)/tetrisdb/runner.c
 
 $(TEST_BIN_DIR)/test_session: tests/test_session.c $(LIB_DIR)/libtetrissh.a $(LIB_DIR)/libtetrisutil.a $(HEADERS)
 	$(CC) $(CFLAGS) tests/test_session.c -o $@ $(LDFLAGS) -ltetrissh -ltetrisutil -lssl -lcrypto
@@ -193,26 +98,26 @@ $(TEST_BIN_DIR)/test_htttp: tests/test_htttp.c $(LIB_DIR)/libhtttp.a $(LIB_DIR)/
 $(TEST_BIN_DIR)/test_logd: tests/test_logd.c src/tetrisd/room.c $(BIN_DIR)/tetrislogd $(BIN_DIR)/tetrisctl $(LIB_DIR)/libhtttp.a $(LIB_DIR)/libtetrisbrain.a $(LIB_DIR)/libtetrisutil.a $(HEADERS)
 	$(CC) $(CFLAGS) tests/test_logd.c src/tetrisd/room.c -o $@ $(LDFLAGS) -lhtttp -ltetrisbrain -ltetrisutil
 
-$(TEST_BIN_DIR)/test_db: tests/test_db.c src/tetrisdb/runner.c $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a $(HEADERS)
-	$(CC) $(CFLAGS) -Isrc $(filter %.c,$^) -o $@ $(LDFLAGS) -ltetrisdb -ltetrisutil -lpthread
+$(TEST_BIN_DIR)/test_db: tests/test_db.c $(DB_RUNNER_SRC) $(LIB_DIR)/libtetrisdb.a $(LIB_DIR)/libtetrisutil.a $(HEADERS)
+	$(CC) $(CFLAGS) -I$(SHARED_SRC) $(filter %.c,$^) -o $@ $(LDFLAGS) -ltetrisdb -ltetrisutil -lpthread
 
-$(TEST_BIN_DIR)/test_history: tests/test_history.c src/tetrisdb/runner.c src/tetrisd/history.c $(LIBS) $(HEADERS)
-	$(CC) $(CFLAGS) -Isrc $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
+$(TEST_BIN_DIR)/test_history: tests/test_history.c $(DB_RUNNER_SRC) src/tetrisd/history.c $(LIBS) $(HEADERS)
+	$(CC) $(CFLAGS) -I$(SHARED_SRC) $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
 
-$(TEST_BIN_DIR)/test_auth: tests/test_auth.c src/tetrisdb/runner.c $(LIBS) $(HEADERS)
-	$(CC) $(CFLAGS) -Isrc/libtetrisauth/lib -Isrc/tetrisdb $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
+$(TEST_BIN_DIR)/test_auth: tests/test_auth.c $(DB_RUNNER_SRC) $(LIBS) $(HEADERS)
+	$(CC) $(CFLAGS) -I$(SHARED_SRC)/libtetrisauth/lib -I$(SHARED_SRC)/tetrisdb $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
 
-$(TEST_BIN_DIR)/test_race_cond: tests/test_race_cond.c src/tetrisdb/runner.c src/tetrisd/history.c $(LIBS) $(HEADERS)
-	$(CC) $(CFLAGS) -Isrc $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
+$(TEST_BIN_DIR)/test_race_cond: tests/test_race_cond.c $(DB_RUNNER_SRC) src/tetrisd/history.c $(LIBS) $(HEADERS)
+	$(CC) $(CFLAGS) -I$(SHARED_SRC) $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
 
 # token.c and hex.c are compiled in directly, and nothing else is: the suite is
 # also the architectural assertion that the token layer depends on libcrypto
 # alone. An #include of another library in it stops this target linking.
-$(TEST_BIN_DIR)/test_token: tests/test_token.c src/libtetrisauth/lib/token.c src/libtetrisauth/lib/hex.c $(LIB_DIR)/libtetrisutil.a $(HEADERS)
-	$(CC) $(CFLAGS) -Isrc/libtetrisauth/lib $(filter %.c,$^) -o $@ $(LDFLAGS) -ltetrisutil -lcrypto
+$(TEST_BIN_DIR)/test_token: tests/test_token.c $(SHARED_SRC)/libtetrisauth/lib/token.c $(SHARED_SRC)/libtetrisauth/lib/hex.c $(LIB_DIR)/libtetrisutil.a $(HEADERS)
+	$(CC) $(CFLAGS) -I$(SHARED_SRC)/libtetrisauth/lib $(filter %.c,$^) -o $@ $(LDFLAGS) -ltetrisutil -lcrypto
 
-$(TEST_BIN_DIR)/test_rc: tests/test_rc.c src/tetrislogd/config.c $(LIBS) $(HEADERS)
-	$(CC) $(CFLAGS) -Isrc/libtetrisauth/lib $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
+$(TEST_BIN_DIR)/test_rc: tests/test_rc.c $(SHARED_SRC)/tetrislogd/config.c $(LIBS) $(HEADERS)
+	$(CC) $(CFLAGS) -I$(SHARED_SRC)/libtetrisauth/lib $(filter %.c,$^) -o $@ $(LDFLAGS) $(LDLIBS)
 
 $(TEST_BIN_DIR)/test_tetrisdb: tests/test_tetrisdb.c $(BIN_DIR)/tetrisdb $(HEADERS)
 	$(CC) $(CFLAGS) tests/test_tetrisdb.c -o $@ -lpthread

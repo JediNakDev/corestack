@@ -1,0 +1,36 @@
+# tetriSH: the weekly profile that drives the real SimpleDB runner.
+#
+# Separate from tetrish.yml because it builds the jar first and then runs the
+# stress suites on top of it - 45 minutes, not 5, which is a schedule's job and
+# not a pull request's.
+name: tetriSH full live-runner profile
+
+on:
+  schedule:
+    - cron: "17 19 * * 1"
+  workflow_dispatch:
+  release:
+    types: [published]
+
+defaults:
+  run:
+    working-directory: tetriSH
+
+jobs:
+  full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y ant libssl-dev libncurses-dev
+
+      # `make java` rather than a bare ant invocation: the shared db/ tree is
+      # at the repo root now, and the Makefile is what knows where.
+      - name: Build database runner
+        run: make java
+
+      - name: Run full live-runner profile
+        run: make test-full

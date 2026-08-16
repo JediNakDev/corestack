@@ -1,0 +1,5 @@
+CompileFlags:
+  # The shared core, for editing anything under core/. Each project has its
+  # own .clangd that puts its include/ ahead of this one - which is how
+  # tetrisdb/provision.h resolves per project.
+  Add: [-Icore/include, -Wall, -Wextra]

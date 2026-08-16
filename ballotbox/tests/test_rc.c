@@ -5,7 +5,7 @@
  * same thing the daemons see.
  *
  * auth_conf_load() freezes itself after its first successful call and never
- * re-reads the file (see src/libtetrisauth/lib/conf.c), so unlike config()
+ * re-reads the file (see core/src/libtetrisauth/lib/conf.c), so unlike config()
  * it cannot be re-exercised per fixture within this one process. It gets
  * exactly one case here, run last, against a fixture broad enough to touch
  * every auth_ key at once.
@@ -21,7 +21,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#include "../src/tetrislogd/logger.h"
+#include "../../core/src/tetrislogd/logger.h"
 #include "libtetrisutil/rc.h"
 #include "auth.h"
 

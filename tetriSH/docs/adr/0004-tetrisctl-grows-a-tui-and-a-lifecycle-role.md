@@ -65,7 +65,7 @@ available if it ever bites.
 
 `dspawn2` daemonises before it execs, which means its parent
 `exit(EXIT_SUCCESS)` fires after the **first** fork
-(`src/tetrish/system_programs/dspawn2.c:63`), well before `execvp` runs at
+(`core/src/tetrish/system_programs/dspawn2.c:63`), well before `execvp` runs at
 line 127. A caller that waits on it learns only that forking worked.
 
 This is correct behaviour for a daemoniser and wrong to rely on. `execvp`

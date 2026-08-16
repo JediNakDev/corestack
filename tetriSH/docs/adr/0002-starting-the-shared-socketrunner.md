@@ -81,7 +81,7 @@ ADR 0001 does not make that mistake, and this finding strengthens it.
 It had already argued that the durability angle was insurance against a case `tetrislogd` does not create, and it explicitly moved the decision onto failure behaviour rather than onto what reaches disk.
 Its two load-bearing reasons, the flight recorder not sharing a failure domain with the engine and fire-and-forget having to learn to reconnect and to time out, are untouched, and they were the right things to decide on.
 
-`include/libtetrisdb/tetrisdb.h` describes closing stdin as "the only shutdown path that flushes dirty pages".
+`core/include/libtetrisdb/tetrisdb.h` describes closing stdin as "the only shutdown path that flushes dirty pages".
 That should be corrected where it stands.
 It is true of `PipeRunner`'s transport and misleading as a statement about SimpleDB.
 

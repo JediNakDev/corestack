@@ -452,7 +452,7 @@ static int test_rows_group_by_two_columns(void)
 /*
  * Whether SimpleDB prints zero rows or one row holding a sentinel for an
  * aggregate over an empty group is exactly the ambiguity
- * include/libtetrisdb/socket/db.h documents for db_next_id(). history.c's
+ * core/include/libtetrisdb/socket/db.h documents for db_next_id(). history.c's
  * read_scalar() never has to resolve it: history_read_player() only ever
  * calls it after an earlier query has already shown the group is non-empty.
  * This pins the one shape that is documented (zero rows), not the other.

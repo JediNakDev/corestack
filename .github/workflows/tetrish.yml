@@ -1,0 +1,55 @@
+# tetriSH: build and fast suites, on both platforms it is expected to run on.
+#
+# GitHub only reads workflows from the repository root, so this file lives here
+# rather than in tetriSH/ - and every job sets working-directory to tetriSH,
+# because that is where the Makefile, .tetrishrc and var/ live. Steps that name
+# a path OUTSIDE `run:` (uses: with, cache paths, artifact paths) are NOT
+# affected by working-directory and have to spell the tetriSH/ prefix out.
+name: tetriSH
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: tetriSH
+
+jobs:
+  macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install OpenSSL
+        run: brew list openssl@3 >/dev/null 2>&1 || brew install openssl@3
+
+      - name: Build
+        run: make all
+
+      - name: Run tests
+        run: make test-fast
+
+      - name: Build interactive test harnesses
+        run: make gui
+
+  ubuntu:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y ant libssl-dev libncurses-dev
+
+      - name: Build
+        run: make all
+
+      - name: Run tests
+        run: make test-fast
+
+      - name: Build interactive test harnesses
+        run: make gui

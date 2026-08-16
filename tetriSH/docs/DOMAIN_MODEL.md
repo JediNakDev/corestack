@@ -9,7 +9,7 @@ literal embedding, not a pointer. An open diamond means "refers to by handle" (a
 dashed arrow means "derived from", "flattened into", or "measured into". A box with only a
 `<<figure N>>` stereotype is drawn in full elsewhere and appears here just to anchor the edge.
 
-Array bounds come from `include/libtetrisutil/limits.h`: `MAX_SESSIONS` = `MAX_ROOMS` =
+Array bounds come from `core/include/libtetrisutil/limits.h`: `MAX_SESSIONS` = `MAX_ROOMS` =
 `MAX_ROOM_MEMBERS` = 254, `MAX_STANDINGS` = 8, `MAX_PLAYER_NAME` = 16, board = 24 × 10.
 
 Two name collisions are real and deliberate — different translation units, unrelated shapes:
@@ -17,7 +17,7 @@ Two name collisions are real and deliberate — different translation units, unr
 | Name | One | The other |
 | --- | --- | --- |
 | `Client` | `include/tetrisu/client.h` — the whole client program's state | `src/tetrisd/room.c` — one member slot in a room |
-| `Session` / `session_t` | `include/tetrisd/session.h` — a server session process | `include/libtetrissh/tetrissh.h` — an encrypted transport session |
+| `Session` / `session_t` | `include/tetrisd/session.h` — a server session process | `core/include/libtetrissh/tetrissh.h` — an encrypted transport session |
 
 
 ---
@@ -1094,38 +1094,38 @@ Tick fan-out measures cadence error per client against the scheduled tick. Battl
 
 | Struct | File | Role |
 | --- | --- | --- |
-| `Piece` | `include/libtetrisutil/gamestate.h:67` | Falling piece: kind, rotation, origin |
-| `PlayerStanding` | `include/libtetrisutil/gamestate.h:104` | One scoreboard row |
-| `GameState` | `include/libtetrisutil/gamestate.h:167` | Whole board + engine counters + room scoreboard |
-| `RoomMember` | `include/libtetrisutil/sessionstate.h:39` | One roster row in the lobby |
-| `SessionState` | `include/libtetrisutil/sessionstate.h:66` | Phase, room, player id, ownership, roster |
-| `auth_budget_t` | `include/libtetrisutil/authbudget.h:50` | Per-connection auth attempt budget |
-| `log_msg_t` | `include/libtetrisutil/logmsg.h:31` | The logging datagram on the wire |
-| `history_round_t` | `include/libtetrisutil/historyview.h:25` | One past round, 32-bit timestamps |
-| `player_history_t` | `include/libtetrisutil/historyview.h:36` | Recent rounds + bests for one player |
+| `Piece` | `core/include/libtetrisutil/gamestate.h:67` | Falling piece: kind, rotation, origin |
+| `PlayerStanding` | `core/include/libtetrisutil/gamestate.h:104` | One scoreboard row |
+| `GameState` | `core/include/libtetrisutil/gamestate.h:167` | Whole board + engine counters + room scoreboard |
+| `RoomMember` | `core/include/libtetrisutil/sessionstate.h:39` | One roster row in the lobby |
+| `SessionState` | `core/include/libtetrisutil/sessionstate.h:66` | Phase, room, player id, ownership, roster |
+| `auth_budget_t` | `core/include/libtetrisutil/authbudget.h:50` | Per-connection auth attempt budget |
+| `log_msg_t` | `core/include/libtetrisutil/logmsg.h:31` | The logging datagram on the wire |
+| `history_round_t` | `core/include/libtetrisutil/historyview.h:25` | One past round, 32-bit timestamps |
+| `player_history_t` | `core/include/libtetrisutil/historyview.h:36` | Recent rounds + bests for one player |
 | `PieceDef` | `src/libtetrisbrain/piece.c` | Static rotation table entry |
-| `htttp_header_t` | `include/libhtttp/htttp.h:71` | One parsed header |
-| `htttp_request_t` | `include/libhtttp/htttp.h:81` | Zero-copy parsed request |
-| `htttp_response_t` | `include/libhtttp/htttp.h:90` | Zero-copy parsed response |
-| `session_t` | `include/libtetrissh/tetrissh.h:47` | Encrypted transport session (fd + key) |
-| `auth_conf_t` | `src/libtetrisauth/auth.h:53` | Auth tunables from the rc file |
-| `cred_t` | `src/libtetrisauth/auth.h:87` | Borrowed username/password slices |
-| `jwt_claims_t` | `include/libtetrisauth/jwt.h:68` | sub / name / iat / exp |
-| `seg_t` | `src/libtetrisauth/jwt.c` | Byte slice into a token |
-| `jwt_parts_t` | `src/libtetrisauth/jwt.c` | Header, payload, signature, signing input |
-| `json_member_t` | `src/libtetrisauth/jwt.c` | One key/value from the claim scanner |
-| `json_iter_t` | `src/libtetrisauth/jwt.c` | Claim scanner cursor |
-| `db_wire_t` | `src/libtetrisdb/wire.h` | Buffered line reader over an fd |
-| `db_proc_t` | `src/libtetrisdb/pipe/proc.h` | Forked SimpleDB child: pid, stdin, stdout |
-| `struct db` | `src/libtetrisdb/pipe/queue.c:10` | Async statement queue + worker thread |
-| `db_opts_t` | `include/libtetrisdb/pipe/db.h:15` | Pipe transport config |
-| `struct db_socket` | `src/libtetrisdb/socket/socket.c:24` | Socket transport connection + deadline |
-| `db_socket_opts_t` | `include/libtetrisdb/socket/db.h` | Socket path + timeout |
-| `db_runner_opts_t` | `include/libtetrisdb/socket/runner.h:62` | How to spawn the Java runner |
-| `logd_opts_t` | `src/tetrislogd/logger.h` | Logger daemon config |
-| `logd_stats_t` | `src/tetrislogd/logger.h` | Received / filtered / dropped counters |
-| `logd_mirror_t` | `src/tetrislogd/logger.h` | DB handle + next row id |
-| `logd_summary_window_t` | `src/tetrislogd/logger.h` | Periodic summary window |
+| `htttp_header_t` | `core/include/libhtttp/htttp.h:71` | One parsed header |
+| `htttp_request_t` | `core/include/libhtttp/htttp.h:81` | Zero-copy parsed request |
+| `htttp_response_t` | `core/include/libhtttp/htttp.h:90` | Zero-copy parsed response |
+| `session_t` | `core/include/libtetrissh/tetrissh.h:47` | Encrypted transport session (fd + key) |
+| `auth_conf_t` | `core/src/libtetrisauth/auth.h:53` | Auth tunables from the rc file |
+| `cred_t` | `core/src/libtetrisauth/auth.h:87` | Borrowed username/password slices |
+| `jwt_claims_t` | `core/include/libtetrisauth/jwt.h:68` | sub / name / iat / exp |
+| `seg_t` | `core/src/libtetrisauth/jwt.c` | Byte slice into a token |
+| `jwt_parts_t` | `core/src/libtetrisauth/jwt.c` | Header, payload, signature, signing input |
+| `json_member_t` | `core/src/libtetrisauth/jwt.c` | One key/value from the claim scanner |
+| `json_iter_t` | `core/src/libtetrisauth/jwt.c` | Claim scanner cursor |
+| `db_wire_t` | `core/src/libtetrisdb/wire.h` | Buffered line reader over an fd |
+| `db_proc_t` | `core/src/libtetrisdb/pipe/proc.h` | Forked SimpleDB child: pid, stdin, stdout |
+| `struct db` | `core/src/libtetrisdb/pipe/queue.c:10` | Async statement queue + worker thread |
+| `db_opts_t` | `core/include/libtetrisdb/pipe/db.h:15` | Pipe transport config |
+| `struct db_socket` | `core/src/libtetrisdb/socket/socket.c:24` | Socket transport connection + deadline |
+| `db_socket_opts_t` | `core/include/libtetrisdb/socket/db.h` | Socket path + timeout |
+| `db_runner_opts_t` | `core/include/libtetrisdb/socket/runner.h:62` | How to spawn the Java runner |
+| `logd_opts_t` | `core/src/tetrislogd/logger.h` | Logger daemon config |
+| `logd_stats_t` | `core/src/tetrislogd/logger.h` | Received / filtered / dropped counters |
+| `logd_mirror_t` | `core/src/tetrislogd/logger.h` | DB handle + next row id |
+| `logd_summary_window_t` | `core/src/tetrislogd/logger.h` | Periodic summary window |
 | `Session` | `include/tetrisd/session.h:26` | One session process: state, board, two fds |
 | `AdminMsg` | `include/tetrisd/adminmsg.h:114` | Fixed-size session ↔ admin message |
 | `RoomInfo` | `include/tetrisd/room.h:61` | Flattened room row for the control plane |

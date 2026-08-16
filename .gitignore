@@ -1,0 +1,30 @@
+# Repo-wide ignores. Each project also has its own .gitignore for the things
+# only it produces (ballotbox's fuzzing artifacts, tetriSH's coverage counters).
+
+.DS_Store
+.vscode/
+.cache/
+compile_commands.json
+
+# Build output. Every project writes these into its own directory; obj/ is
+# where shared.mk puts objects, so nothing lands in core/ or db/ any more.
+bin/
+obj/
+lib/*.a
+var/
+*.o
+*.d
+/tetrish
+*/tetrish
+
+# Runtime state and secrets, generated per checkout by `make rc` / `make secret`.
+.tetrishrc
+auth/jwt_secret
+
+*.log
+log
+
+# SimpleDB test artifacts, written into the working directory by `ant test`.
+# The jar and the class files db/build.xml produces are already covered by
+# db/.gitignore.
+simple*.db

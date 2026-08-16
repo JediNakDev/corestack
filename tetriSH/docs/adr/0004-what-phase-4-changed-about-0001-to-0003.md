@@ -20,7 +20,7 @@ ADR 0003 stays as it was accepted, findings and all, because a reader needs to s
 
 ## Change 1: `tetrisdb.h` is now `pipe.h`
 
-`include/libtetrisdb/tetrisdb.h` is `include/libtetrisdb/pipe.h`.
+`core/include/libtetrisdb/tetrisdb.h` is `core/include/libtetrisdb/pipe.h`.
 
 libtetrisdb grew a second contract in #44, so a header named after the library no longer said which of the two it was.
 The names now match the split: `pipe.h` is a child process and a lossy queue, `socket.h` is one connection under a deadline.
@@ -33,20 +33,20 @@ That correction is made, in `pipe.h`.
 
 ## Change 2: `tdb_status_t` belongs to the wire, not to a transport
 
-The two transports share the line protocol (`db/docs/c-daemon-integration.md` section 4), and `src/libtetrisdb/wire.c` implements it once for both.
+The two transports share the line protocol (`db/docs/c-daemon-integration.md` section 4), and `core/src/libtetrisdb/wire.c` implements it once for both.
 
 Its header reached the statement-outcome enum by including `libtetrisdb/socket.h`, so `pipe/proc.h` transitively saw `tdb_socket_t`, `tdb_socket_exec` and `tdb_row_count`.
 Both `wire.h` and `proc.h` carried comments claiming the compiler enforced the separation between the two paths.
 It did not: the dependency ran one way, and only one way.
 
-`tdb_status_t` now lives in `include/libtetrisdb/status.h`, which both transports and the wire include, and neither transport's header includes the other's.
+`tdb_status_t` now lives in `core/include/libtetrisdb/status.h`, which both transports and the wire include, and neither transport's header includes the other's.
 The markers are the protocol, so the enum belongs to the protocol.
 
 ## Change 3: steps 6 to 8 of ADR 0002 live in libtetrisdb, not in the launcher
 
 ADR 0002's step list reads as though `bin/tetrisdb` writes all eight steps.
 It does not.
-`tdb_runner_spawn()` and `tdb_runner_wait()` in `include/libtetrisdb/runner.h` own the argv, the fork, the `setsid` and the readiness poll.
+`tdb_runner_spawn()` and `tdb_runner_wait()` in `core/include/libtetrisdb/runner.h` own the argv, the fork, the `setsid` and the readiness poll.
 
 The deciding reason is ADR 0001's own condition for accepting two runners at all: resolving and validating the `java` and jar pair belongs in `libtetrisdb`, shared with `tdb_start()`, so the version trap has one home.
 Keeping the spawn in the launcher would have put one of the two spawn paths outside the library and given that trap two homes again.
@@ -56,7 +56,7 @@ The launcher keeps everything that is true of a tetriSH installation rather than
 Two consequences carry:
 
 - The lock from step 1 reaches the JVM because `tdb_runner_spawn()` closes nothing but the standard descriptors, so the caller's lock fd must not be `FD_CLOEXEC` and must not be fd 0, 1 or 2.
-  This is a prose obligation across a seam, and it forces an `F_DUPFD` dance in `src/tetrisdb/main.c`.
+  This is a prose obligation across a seam, and it forces an `F_DUPFD` dance in `core/src/tetrisdb/main.c`.
   It is a cost, not a design: see "Revisit if" below.
 - `tests/test_db.c` starts its runner through the same two functions rather than its own `fork`/`exec`, so the argv the tests exercise is the argv the launcher uses.
 
@@ -65,7 +65,7 @@ Two consequences carry:
 ADR 0003 decided that "every path tetriSH opens is resolved against one root, worked out by one helper in libtetrisutil", and named `tetrish_root()`, `tetrish_path()` and `rc_load_root()`.
 
 That decision is reversed.
-There is no `include/libtetrisutil/root.h` and no `src/libtetrisutil/root.c`, and no reader resolves a root.
+There is no `core/include/libtetrisutil/root.h` and no `core/src/libtetrisutil/root.c`, and no reader resolves a root.
 
 Its three findings are not what is being reversed.
 Findings 1 and 2 are facts about this tree and are still true; finding 3 is right and is kept below.
@@ -118,22 +118,22 @@ Under `dspawn` it is finding 1's bug, which belongs to `resolve_root()` and shou
 
 ## Change 5: #53's one file pair is restored
 
-`src/libtetrisauth/jwt_helper/` is gone.
+`core/src/libtetrisauth/jwt_helper/` is gone.
 
-base64url and the JSON reader are statics inside `src/libtetrisauth/jwt.c`, which is what #53 decided: "One file pair, `src/libtetrisauth/jwt.c` + `include/libtetrisauth/jwt.h`, with base64url and the JSON layer as statics inside it."
+base64url and the JSON reader are statics inside `core/src/libtetrisauth/jwt.c`, which is what #53 decided: "One file pair, `core/src/libtetrisauth/jwt.c` + `core/include/libtetrisauth/jwt.h`, with base64url and the JSON layer as statics inside it."
 The split had exported `json_iter_t`, `json_member_t` and `json_kind_t` across two headers with one consumer each, against the same ticket's "never builds a value model".
 
 `bin/tests/test_jwt` still compiles the source and links `-lcrypto` only, so the portability claim stays a build failure rather than a review comment.
 
 ## Consequences
 
-- `rc_load()` gains a typed layer, `rc_bind()`, because three readers - `src/tetrislogd/config.c`, `src/libtetrisdb/socket/runner.c` and `src/libtetrisauth/authconf.c` - had each rebuilt the same whole-string `strtol`, range check, fixed-size copy and first-bad-value report from the string callback.
+- `rc_load()` gains a typed layer, `rc_bind()`, because three readers - `core/src/tetrislogd/config.c`, `core/src/libtetrisdb/socket/runner.c` and `core/src/libtetrisauth/authconf.c` - had each rebuilt the same whole-string `strtol`, range check, fixed-size copy and first-bad-value report from the string callback.
   A reader declares an `rc_key_t` table instead of writing a callback.
   All three are converted.
-- The player-name rule has one owner, `include/libtetrisutil/playername.h`.
+- The player-name rule has one owner, `core/include/libtetrisutil/playername.h`.
   It was written three times and the three disagreed: the client used `isalnum()`, which is locale-sensitive, so the client could accept a name the server then refused.
   `jwt.c` keeps a deliberate fourth copy, because it may include nothing outside OpenSSL.
-- The `db_` namespace's defaults and bounds are in `include/libtetrisdb/dbconf.h`, once.
+- The `db_` namespace's defaults and bounds are in `core/include/libtetrisdb/dbconf.h`, once.
   They had been written three times across two libraries, with a comment in `authconf.c` saying plainly that nothing checked the copies agreed.
   A key its owner validates but does not consume - `db_timeout` for the launcher, `log_send_attempts` for tetrislogd - is `check_only` in the key table rather than a local called `ignored`.
 

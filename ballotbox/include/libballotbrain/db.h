@@ -43,7 +43,7 @@ struct bb_ctx;
 /*
  * The catalog lines ballotd must ensure (db_ensure_table) before bin/
  * tetrisdb start ever runs against this data directory - same precedent as
- * TETRISAUTH_DB_TABLE/SCHEMA in include/libtetrisauth/auth.h, and for
+ * TETRISAUTH_DB_TABLE/SCHEMA in core/include/libtetrisauth/auth.h, and for
  * the same reason: the schema text lives beside db.c, its only parser, so a
  * column reordered in one file cannot silently disagree with the positional
  * db_row_fields() reads here. See db.c's file comment for the full schema

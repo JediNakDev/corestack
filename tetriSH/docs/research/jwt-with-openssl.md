@@ -231,7 +231,7 @@ The check must be `== 1`.
 The repo already gets this right - see §4.
 
 **Padding.** RS256 is PKCS#1 v1.5, which is `EVP_PKEY_CTX_set_rsa_padding(pctx, RSA_PKCS1_PADDING)`.
-This is *not* what the repo's existing `sign_message_pss` does - that sets `RSA_PKCS1_PSS_PADDING` (`src/libtetrissh/common.c:251`), which is the `PS256` JWA algorithm, listed as Optional in [RFC 7518 §3.1](https://datatracker.ietf.org/doc/html/rfc7518#section-3).
+This is *not* what the repo's existing `sign_message_pss` does - that sets `RSA_PKCS1_PSS_PADDING` (`core/src/libtetrissh/common.c:251`), which is the `PS256` JWA algorithm, listed as Optional in [RFC 7518 §3.1](https://datatracker.ietf.org/doc/html/rfc7518#section-3).
 The existing helpers are therefore *structurally* reusable but not directly reusable for RS256 without changing the padding mode.
 PKCS#1 v1.5 is the default padding for RSA in OpenSSL, so an RS256 path can simply omit the padding call - but that means it cannot share code with the PSS helpers as they stand.
 
@@ -318,7 +318,7 @@ All three claims are OPTIONAL per RFC 7519 §4.1, which means **a verifier that 
 The RFC gives no specific number, only that ceiling.
 
 **Clock source.** `exp`/`nbf` are wall-clock UTC seconds, so they must be compared against `time(NULL)`, not `CLOCK_MONOTONIC`.
-This is a live distinction in this codebase: `src/tetrisd/session.c:56-60` defines `now_ms()` on `CLOCK_MONOTONIC` and comments that it is "immune to wall-clock changes", and `get_time()` at `src/libtetrissh/common.c:600` is another existing clock helper.
+This is a live distinction in this codebase: `src/tetrisd/session.c:56-60` defines `now_ms()` on `CLOCK_MONOTONIC` and comments that it is "immune to wall-clock changes", and `get_time()` at `core/src/libtetrissh/common.c:600` is another existing clock helper.
 Neither is the right clock for JWT claim checking.
 
 ### 3.5 Ordering
@@ -345,15 +345,15 @@ Grepped `src/`, `include/` and `tests/` for `base64`, `EVP_`, `HMAC`, `SHA256`, 
 ### 4.1 Directly reusable
 
 **`HMAC()` with SHA-256 - already used, twice.**
-- `src/libtetrissh/common.c:505-507` (in `session_encrypt`)
-- `src/libtetrissh/common.c:544-546` (in `session_decrypt`)
+- `core/src/libtetrissh/common.c:505-507` (in `session_encrypt`)
+- `core/src/libtetrissh/common.c:544-546` (in `session_decrypt`)
 
 Both call `HMAC(EVP_sha256(), key, len, data, len, out, &outlen)` in exactly the one-shot form HS256 needs.
-`HMAC_LEN` is already defined as 32 at `src/libtetrissh/common.h:65`, and `openssl/hmac.h` is already included at `src/libtetrissh/common.h:39`.
+`HMAC_LEN` is already defined as 32 at `core/src/libtetrissh/common.h:65`, and `openssl/hmac.h` is already included at `core/src/libtetrissh/common.h:39`.
 An HS256 signer is this same call over the signing input.
 
 **`CRYPTO_memcmp` - already used correctly.**
-`src/libtetrissh/common.c:551`:
+`core/src/libtetrissh/common.c:551`:
 
 ```c
 if (CRYPTO_memcmp(hmac_computed, hmac_received, HMAC_LEN) != 0)
@@ -363,17 +363,17 @@ Compares raw 32-byte MACs with an explicit length, checked against 0 - this is t
 Note the surrounding code also does a length floor check first (`common.c:530`) before slicing the buffer, which is the analogous defence to the "reject signatures that are not exactly 32 bytes" rule.
 
 **`RAND_bytes` - already used, with the return value checked.**
-- `src/libtetrissh/common.c:439` (`generate_session_key`)
-- `src/libtetrissh/common.c:462` (IV generation in `session_encrypt`)
+- `core/src/libtetrissh/common.c:439` (`generate_session_key`)
+- `core/src/libtetrissh/common.c:462` (IV generation in `session_encrypt`)
 
 Both check `!= 1`, which matches `RAND_bytes(3ssl)` RETURN VALUES: "return 1 on success, -1 if not supported by the current RAND method, or 0 on other failure ... it is important to always check the error return value."
-An HS256 secret can be minted the same way. `openssl/rand.h` is already included at `src/libtetrissh/common.h:38`.
+An HS256 secret can be minted the same way. `openssl/rand.h` is already included at `core/src/libtetrissh/common.h:38`.
 
-**`print_ssl_error`** - existing OpenSSL error-reporting helper, declared at `src/libtetrissh/common.h:238`, defined at `src/libtetrissh/common.c:589`.
+**`print_ssl_error`** - existing OpenSSL error-reporting helper, declared at `core/src/libtetrissh/common.h:238`, defined at `core/src/libtetrissh/common.c:589`.
 
 ### 4.2 Structurally similar but not directly reusable
 
-**`sign_message_pss` / `verify_message_pss`** - `src/libtetrissh/common.c:233` and `src/libtetrissh/common.c:281`, declared at `src/libtetrissh/common.h:164` and `:172`.
+**`sign_message_pss` / `verify_message_pss`** - `core/src/libtetrissh/common.c:233` and `core/src/libtetrissh/common.c:281`, declared at `core/src/libtetrissh/common.h:164` and `:172`.
 
 These are the full `EVP_DigestSignInit` -> `Update` -> `Final` (two-pass length probe at `common.c:260` and `:267`) and `EVP_DigestVerifyInit` -> `Update` -> `Final` shape that RS256 would need.
 Two reasons they cannot be used as-is:
@@ -383,15 +383,15 @@ Two reasons they cannot be used as-is:
 
 Worth noting for correctness precedent: `common.c:311` checks `EVP_DigestVerifyFinal(...) == 1`, which is the correct comparison per §2.5 above.
 
-**Key loading.** `load_private_key` at `src/libtetrissh/common.c:101` (declared `common.h:126`), and a second independent `load_server_key` at `src/tetrisd/session.c:42`.
+**Key loading.** `load_private_key` at `core/src/libtetrissh/common.c:101` (declared `common.h:126`), and a second independent `load_server_key` at `src/tetrisd/session.c:42`.
 The comment at `src/tetrisd/session.c:36-41` explains the duplication: `common.h` is deliberately not in `include/`, "so the OpenSSL helper surface stays private to that library", and `session_accept()` takes an `EVP_PKEY*` so the application owns key loading.
-Any RS256 work must respect that boundary - a JWT module in `src/libtetrissh/` can use `common.h`, one outside it cannot.
+Any RS256 work must respect that boundary - a JWT module in `core/src/libtetrissh/` can use `common.h`, one outside it cannot.
 
 ### 4.3 Not present at all
 
 - **No base64 of any kind.** No `base64`, `EVP_Encode*`, `EVP_Decode*` or `BIO_f_base64` anywhere in `src/`, `include/` or `tests/`. This is net-new code regardless of the algorithm chosen.
 - **No JSON.** No JSON parser or serializer in the tree, and no JSON dependency in the Makefile. This is the part of the cost estimate most likely to be underestimated: a JWT needs a JSON *writer* for the header and claims (easy, since the issuer controls the shape) and a JSON *reader* for the claims on verify (harder, since it parses attacker-supplied bytes even though they are signed). The header `{"alg":"HS256","typ":"JWT"}` and a fixed claim set can both be handled without a general parser, but that is a design decision, not a given.
-- **No existing JWT, token-minting or auth-token code.** The `token` grep hits in `src/tetrish/shell.c`, `src/tetrish/main.c`, `src/tetrish/system_programs/ld.c` and `src/tetrish/lib/rc_parser.c` are all `strtok` string tokenizing, unrelated. The `token` references in `common.h:224-230` and `common.c:518-539` mean the AES+HMAC session blob, not a JWT.
+- **No existing JWT, token-minting or auth-token code.** The `token` grep hits in `core/src/tetrish/shell.c`, `core/src/tetrish/main.c`, `core/src/tetrish/system_programs/ld.c` and `core/src/tetrish/lib/rc_parser.c` are all `strtok` string tokenizing, unrelated. The `token` references in `common.h:224-230` and `common.c:518-539` mean the AES+HMAC session blob, not a JWT.
 - **No 2048-bit RSA key.** `auth/private_key.pem` is 1024-bit (see §2.1). `auth/generate_keys.sh` is empty (0 bytes), so nothing in the repo records how to regenerate it.
 
 ## 5. What a minimal correct implementation consists of
@@ -407,7 +407,7 @@ Shared, regardless of algorithm:
 6. Signature check over the **original** header and payload segment bytes (§3.5).
 7. `exp` present and `now < exp`; `nbf` if present and `now >= nbf`; leeway of at most a few minutes; wall clock, not monotonic (§3.4).
 
-Plus, for HS256: one `HMAC()` call, one length check, one `CRYPTO_memcmp` - roughly 15 lines, all of it patterned on code that already exists at `src/libtetrissh/common.c:505` and `:551`.
+Plus, for HS256: one `HMAC()` call, one length check, one `CRYPTO_memcmp` - roughly 15 lines, all of it patterned on code that already exists at `core/src/libtetrissh/common.c:505` and `:551`.
 
 Plus, for RS256: `EVP_MD_CTX` lifecycle, PKCS#1 v1.5 padding, two-pass sign, `== 1` verify, plus a new 2048-bit key - roughly 60 lines and a key-management change.
 

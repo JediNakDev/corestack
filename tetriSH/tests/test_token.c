@@ -5,7 +5,7 @@
  * exactly this.
  *
  * THIS TARGET IS ALSO AN ARCHITECTURAL ASSERTION. It compiles against
- * src/libtetrisauth/lib/token.c and links -lcrypto only, so an
+ * core/src/libtetrisauth/lib/token.c and links -lcrypto only, so an
  * #include "libtetrissh/..." in it stops it linking. The portability claim
  * that file rests on is a build failure rather than a review comment.
  *

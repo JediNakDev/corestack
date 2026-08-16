@@ -38,7 +38,7 @@
 
 /*
  * Load the server's RSA private key with plain OpenSSL, not libtetrissh's
- * load_private_key(): that helper lives in src/libtetrissh/common.h, which
+ * load_private_key(): that helper lives in core/src/libtetrissh/common.h, which
  * is deliberately not in include/ so the OpenSSL helper surface stays
  * private to that library. session_accept() takes an EVP_PKEY* precisely so
  * the application owns key loading (same rationale as tetrisd/session.c's

@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -863,6 +864,49 @@ static void *admin_thread(void *arg)
 /* entry point                                                         */
 /* ------------------------------------------------------------------ */
 
+/*
+ * Raise this process's open-file limit as far as the hard limit allows.
+ *
+ * A full session table needs one socketpair end per session plus the poll set,
+ * the listening socket and the ctl socket - more descriptors than the 256 a
+ * default soft limit hands out, and the symptom of running out is not an error
+ * the daemon reports: socketpair() fails inside the listener and the client
+ * simply never gets a session. Raising the soft limit to the hard one asks for
+ * nothing the administrator has not already permitted.
+ *
+ * Best effort: a system that refuses still runs, just with fewer sessions than
+ * MAX_SESSIONS promises, which is why the outcome is logged either way.
+ */
+static void raise_fd_limit(void)
+{
+    struct rlimit rl;
+
+    if (getrlimit(RLIMIT_NOFILE, &rl) != 0)
+    {
+        (void)log_send(LOG_WARN,
+                       "operation=raise_fd_limit status=1 reason=getrlimit");
+        return;
+    }
+
+    rlim_t want = (rlim_t)(ADMIN_FIXED_FDS + MAX_SESSIONS) + 64;
+    if (rl.rlim_max != RLIM_INFINITY && want > rl.rlim_max)
+        want = rl.rlim_max;
+
+    if (rl.rlim_cur != RLIM_INFINITY && rl.rlim_cur < want)
+    {
+        rl.rlim_cur = want;
+        if (setrlimit(RLIMIT_NOFILE, &rl) != 0)
+            (void)log_send(LOG_WARN, "operation=raise_fd_limit status=1 "
+                                     "reason=setrlimit");
+    }
+
+    (void)getrlimit(RLIMIT_NOFILE, &rl);
+    (void)log_send(LOG_INFO,
+                   "operation=raise_fd_limit phase=complete soft=%lld "
+                   "sessions=%d status=0",
+                   (long long)rl.rlim_cur, MAX_SESSIONS);
+}
+
 int main(void)
 {
     /* Writing to a socket whose peer already died must not kill us. */
@@ -882,6 +926,10 @@ int main(void)
                    "operation=main event=started program=tetrisd port=%d "
                    "session_bin=%s status=0",
                    g_port, g_session_bin);
+
+    /* After log_open_configured so the outcome is on the record, and before
+     * any thread can accept a connection that would need the descriptors. */
+    raise_fd_limit();
 
     if (pipe(g_notify) < 0 || pipe(g_ctl_notify) < 0 || pipe(g_quit) < 0 ||
         pipe(g_admin_quit) < 0 || pipe(g_reload) < 0 || pipe(g_dump) < 0 ||

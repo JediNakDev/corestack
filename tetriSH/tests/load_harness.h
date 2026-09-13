@@ -123,11 +123,35 @@ static inline void clean_env(TestEnv *env)
 }
 
 /**
+ * The directory the daemon's TLS material is taken from.
+ *
+ * The repo's auth/ unless TETRISH_AUTH_DIR names another one. That override
+ * exists because the shipped server certificate is issued by a course CA and
+ * expires: once it has, every suite that speaks to a real daemon fails in the
+ * handshake, and no amount of fixing the code helps. tests/ephemeral_auth.sh
+ * mints a throwaway CA and leaf and points this at them, so measurement runs
+ * are not blocked on a certificate nobody here can re-sign.
+ *
+ * @param out  Receives an absolute path. repo is this process's cwd.
+ */
+static inline void auth_dir(const char *repo, char *out, size_t cap)
+{
+    const char *override = getenv("TETRISH_AUTH_DIR");
+    if (override != NULL && override[0] == '/')
+        snprintf(out, cap, "%s", override);
+    else if (override != NULL && override[0] != '\0')
+        snprintf(out, cap, "%s/%s", repo, override);
+    else
+        snprintf(out, cap, "%s/auth", repo);
+}
+
+/**
  * Starts a tetrisd on a free port under a private TETRISH_ROOT.
  *
  * The root is a fresh temp directory holding a generated .tetrishrc and
- * symlinks back to the repo's bin/ and auth/, so the daemon finds its session
- * binary and certificates without the test writing anything into the repo.
+ * symlinks back to the repo's bin/ and to the auth directory, so the daemon
+ * finds its session binary and certificates without the test writing anything
+ * into the repo.
  *
  * @param env  Receives the daemon pid and every path to clean up.
  * @returns the listening port, or -1 (nothing left running) on failure.
@@ -150,11 +174,11 @@ static inline int start_daemon(TestEnv *env)
     snprintf(env->bin_link, sizeof env->bin_link, "%s/bin", env->tmp);
     snprintf(env->auth_link, sizeof env->auth_link, "%s/auth", env->tmp);
     snprintf(env->daemon_path, sizeof env->daemon_path, "%s/bin/tetrisd", repo);
-    snprintf(env->ca_path, sizeof env->ca_path, "%s/auth/cacsertificate.crt",
-             repo);
+    auth_dir(repo, repo_auth, sizeof repo_auth);
+    snprintf(env->ca_path, sizeof env->ca_path, "%s/cacsertificate.crt",
+             repo_auth);
     snprintf(env->log_path, sizeof env->log_path, "%s/tetrisd.log", env->tmp);
     snprintf(repo_bin, sizeof repo_bin, "%s/bin", repo);
-    snprintf(repo_auth, sizeof repo_auth, "%s/auth", repo);
 
     FILE *rc = fopen(env->rc_path, "w");
     if (rc == NULL || symlink(repo_bin, env->bin_link) != 0 ||
@@ -167,13 +191,18 @@ static inline int start_daemon(TestEnv *env)
     }
     /* All six directives rc_config() demands, or tetrisd refuses to start and
      * the fixture sees only a ctl socket that never appears. */
+    /* Absolute certificate paths, not auth/-relative ones: the daemon and its
+     * session children run from the repository root and resolve these against
+     * their cwd, not against TETRISH_ROOT - so a relative path would quietly
+     * reach past the auth directory this fixture was told to use. */
     fprintf(rc,
             "listen_port = %d\nctl_ipc = %s\nlog_ipc = %s/no-log.sock\n"
-            "cert_path = auth/server_signed.crt\n"
-            "key_path = auth/private_key.pem\n"
-            "ca_path = auth/cacsertificate.crt\n"
+            "cert_path = %s/server_signed.crt\n"
+            "key_path = %s/private_key.pem\n"
+            "ca_path = %s/cacsertificate.crt\n"
             "log_path = %s\n",
-            port, env->ctl_path, env->tmp, env->log_path);
+            port, env->ctl_path, env->tmp, repo_auth, repo_auth, repo_auth,
+            env->log_path);
     fclose(rc);
 
     env->daemon = fork();

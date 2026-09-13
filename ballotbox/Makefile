@@ -20,7 +20,7 @@ BINS := $(SHARED_BINS) $(BIN_DIR)/ballotd $(BIN_DIR)/ballot_session \
 # rc, secret and java as in tetriSH's `all`: .tetrishrc, auth/jwt_secret and the
 # jar are generated per checkout, and all three are no-ops once they exist.
 .PHONY: all client
-all: dirs rc secret java $(LIBS) $(BINS)
+all: dirs rc secret cert java $(LIBS) $(BINS)
 
 # The client half only: ballotu and the libraries it needs, plus the shell it
 # runs inside - no ballotd, no ballotctl, no java. Drops straight into

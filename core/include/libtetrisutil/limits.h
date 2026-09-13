@@ -28,8 +28,17 @@
  * MAX_SESSIONS bounds both the admin thread's poll set and the room module's
  * client registry, so the two must agree.
  *
- * All three are 254 because a room id travels as a single byte with 0 reserved
- * for "make me a new one".
+ * These were 254 for as long as a room id was believed to travel as a single
+ * byte. It does not: JOIN names its room in the request path (/room/<id>) as
+ * decimal text, and every id in the daemon, in AdminMsg and in SessionState is
+ * an int. The byte was only ever in one place - client_join()'s parameter -
+ * and that is now an int too, so the cap is a capacity decision and nothing
+ * else.
+ *
+ * 1024 is that decision. Each session costs the daemon one socketpair fd and
+ * one forked process, so the real ceiling is RLIMIT_NOFILE and the per-user
+ * process limit; tetrisd raises its own fd limit at startup (see main()) and
+ * a table this size needs ~1029 descriptors for the poll set alone.
  *
  * NOTE the consequence of MAX_ROOM_MEMBERS == MAX_SESSIONS: a room can never
  * fill before the session table does, so room_add_member's full branch is
@@ -37,9 +46,9 @@
  * Lower MAX_ROOM_MEMBERS if you want a real per-room cap - that is the whole
  * reason these three now sit three lines apart instead of in two files.
  */
-#define MAX_SESSIONS 254     /* concurrent client sessions        */
-#define MAX_ROOMS 254        /* concurrent rooms                  */
-#define MAX_ROOM_MEMBERS 254 /* players per room (raise to scale) */
+#define MAX_SESSIONS 1024     /* concurrent client sessions        */
+#define MAX_ROOMS 1024        /* concurrent rooms                  */
+#define MAX_ROOM_MEMBERS 1024 /* players per room (raise to scale) */
 
 /* ---- what travels to a client ------------------------------------------- */
 /*

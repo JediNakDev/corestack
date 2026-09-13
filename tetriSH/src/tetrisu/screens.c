@@ -293,23 +293,28 @@ ScreenResult screen_join_room(Client *c)
     for (;;)
     {
         char buf[16] = "";
-        if (tetrisui_input("Join room", "Room id (1-255, 0 = new room):", buf,
-                           sizeof buf) != 0)
+        char prompt[64];
+        snprintf(prompt, sizeof prompt, "Room id (1-%d, 0 = new room):",
+                 MAX_ROOMS);
+        if (tetrisui_input("Join room", prompt, buf, sizeof buf) != 0)
             return SCR_BACK;
         if (buf[0] == '\0')
             continue;
 
         int id = atoi(buf);
-        /* The wire field is a single byte (server: body_byte). Reject locally
-         * rather than silently truncating 256 to 0, which would create a new
-         * room instead of joining room 256 and look like the server lied. */
-        if (id < 0 || id > 255)
+        /* Checked locally so a typo is answered instantly rather than by a
+         * 409 from a room the server was never going to find. The bound is
+         * the server's room table, which is what JOIN is asking about. */
+        if (id < 0 || id > MAX_ROOMS)
         {
-            say("Invalid room", "Room id must be between 0 and 255.");
+            char msg[64];
+            snprintf(msg, sizeof msg, "Room id must be between 0 and %d.",
+                     MAX_ROOMS);
+            say("Invalid room", msg);
             continue;
         }
 
-        if (client_join(c, (uint8_t)id) != 0)
+        if (client_join(c, id) != 0)
         {
             say("Join failed", "Could not send JOIN to the server.");
             return SCR_DISCONNECTED;

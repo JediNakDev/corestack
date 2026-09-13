@@ -487,7 +487,7 @@ static int run_scenario(const Scenario *scenario)
             client_connect(&clients[connected], "127.0.0.1", port,
                            env.ca_path) != 0 ||
             client_guest(&clients[connected]) != 0 ||
-            client_join(&clients[connected], (uint8_t)room) != 0)
+            client_join(&clients[connected], room) != 0)
             goto fail_clients;
     }
     int restore_result = restore_stdout(saved_stdout);

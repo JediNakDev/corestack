@@ -320,17 +320,68 @@ Test Database Race Condition
 - Allow time out and insert fail
 - But requires no duplicate/gapped IDs among whatever committed
 
-## Concurrency
+## Concurrency and performance
 
-**We can handle 254 players at a time without deadlock, crash, or memory leak**
-Proven by load test.
+The session table holds 1024 (`MAX_SESSIONS` in `core/include/libtetrisutil/limits.h`); the benchmarks below run 300 at once, which is the largest we have actually driven.
+It used to be 254, justified by a comment saying a room id travels as a single byte.
+That was wrong.
+JOIN names its room in the request path as decimal text (`/room/{id}`), and every room and player id in the daemon, in `AdminMsg` and in `SessionState` is already an `int`.
+The byte lived in exactly one place, `client_join()`'s parameter, which is now an `int` too.
+The real ceiling is descriptors and processes, so `tetrisd` raises its own `RLIMIT_NOFILE` at startup.
 
-- We test 254 tetrisu instant connect to tetrisd via TCP socket
-- Fires request every 100ms
-- Since avg person click 5-7 cps, we assumed 10 cps.
-- We test 3 cases
-  - 254 players in 1 room
-  - 254 players in 254 rooms, 1 player per room
-  - 254 players in 20 rooms, randomly assigned
-- Then check for deadlock, memory leak, or crash
-- The game survive 1 hour load test for all 3 cases
+### Load test: does it survive
+
+`make test-stress` runs `tests/test_load.c`: 254 clients over TCP, one request each 100 ms.
+Ten requests per second per player, against a measured 5-7 clicks per second for a human.
+
+Three room layouts, because the fan-out per request is 253 peers in the first and nobody in the second.
+
+| Layout                 | What it stresses                                       |
+| ---------------------- | ------------------------------------------------------ |
+| 254 players, 1 room    | Broadcast amplification: one command touches 253 peers |
+| 254 players, 254 rooms | Table scaling with no broadcast at all                 |
+| 254 players, 20 rooms  | The realistic middle                                   |
+
+All three survive an hour with no deadlock, no leak, no crash.
+
+### Latency benchmark: how fast, and where it breaks
+
+`tests/bench_report.sh` measures request latency and finds the throughput at which p99 leaves its SLO.
+Results below are from an M2 MacBook Air, 8 cores, 16 GB, over loopback.
+
+```sh
+./tests/bench_report.sh          # full set, ~15 min
+./tests/bench_report.sh --quick  # check the rig runs, ~4 min
+```
+
+The probe is a JOIN from a client already in a room, which the server answers `409`.
+It is the only request/response pair in tetriSH whose timing is the server's own service time: it crosses the TLS session, the session process, the socketpair to the admin thread, and comes back, while changing no state and broadcasting to nobody.
+The `MOVE`/`ROTATE`/`DROP` commands get no reply at all, so the only thing to time them against is the next 20 Hz `STATE` push, which puts a 50 ms quantization floor under every percentile.
+That is what `tests/test_saturation.c` measures, and why its p99 cannot mean much.
+
+**Steady state.** 254 clients at 10 req/s each, the same load the stress test uses. 30 s window, 0 dropped.
+
+| offered     | p50     | p99     | p99.9   | samples |
+| ----------- | ------- | ------- | ------- | ------- |
+| 2,540 req/s | 0.27 ms | 0.48 ms | 0.71 ms | 76,201  |
+
+**Saturation.** 300 clients, SLO p99 <= 25 ms.
+
+| offered req/s | p50   | p99    | p99.9  |      |
+| ------------- | ----- | ------ | ------ | ---- |
+| 16,000        | 0.36  | 0.69   | 0.82   | pass |
+| 23,040        | 0.59  | 1.13   | 1.79   | pass |
+| 27,648        | 0.85  | 3.10   | 5.31   | pass |
+| 33,178        | 4.09  | 20.98  | 26.94  | pass |
+| 33,592        | 8.51  | 24.94  | 32.03  | pass |
+| 34,007        | 9.87  | 71.17  | 83.75  | fail |
+| 36,495        | 76.39 | 118.66 | 132.67 | fail |
+
+All ms.
+p99 stays under 1.2 ms across a 44% rate increase, then triples over the 1.2% step from 33,592 to 34,007.
+p50 tells you why: 0.36 ms to 0.85 ms across the whole healthy range, then 24x in the last few steps.
+The work per request never changed, the wait did, which is a queue tipping over rather than the server getting gradually slower.
+Every request crosses the admin thread, and there is one of it for all rooms.
+
+Nine sweeps put the knee between 27.6k and 33.6k req/s, median 30,067.
+Quoting it tighter than that would be a lie about precision this rig cannot deliver.

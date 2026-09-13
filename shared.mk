@@ -238,7 +238,7 @@ SHARED_BINS := tetrish $(BIN_DIR)/tetrislogd $(BIN_DIR)/tetrisdb $(SYSPROG_BINS)
 
 # === Housekeeping ===
 
-.PHONY: dirs java rc secret clean
+.PHONY: dirs java rc secret cert clean
 
 dirs:
 	@mkdir -p $(BIN_DIR) $(LIB_DIR) $(OBJ_DIR) var/log var/run
@@ -266,6 +266,13 @@ secret:
 	  echo "generated auth/jwt_secret (32 bytes, mode 0600)"; }
 
 RC_ROOT := $(subst |,\|,$(subst &,\&,$(subst \,\\,$(CURDIR))))
+
+# The server key and its certificate are not in git - a private key in a public
+# repository is a private key you have given away - so a fresh clone mints its
+# own. No-op once auth/private_key.pem exists, which is why `all` can depend on
+# it without touching real course-issued material on a working checkout.
+cert:
+	@$(SHARED_ROOT)/scripts/provision_auth.sh auth
 
 rc:
 	@[ -f .tetrishrc ] || { sed 's|PATH_TO_THIS_PROGRAM|$(RC_ROOT)|g' \

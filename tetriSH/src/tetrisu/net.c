@@ -183,7 +183,7 @@ static int send_word(Client *c, const char *method, const char *word)
                     (uint32_t)strlen(word));
 }
 
-int client_join(Client *c, uint8_t room_id)
+int client_join(Client *c, int room_id)
 {
     c->room_req = room_id;
     c->assume_owner = (room_id == 0); /* see client.h */

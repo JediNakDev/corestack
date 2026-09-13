@@ -249,7 +249,7 @@ int main(int argc, char **argv)
     long deadline =
         now_ms() + (argc > 4 && strcmp(argv[4], "nostart") == 0 ? 8000 : 1500);
 
-    if (client_join(&c, (uint8_t)room) != 0)
+    if (client_join(&c, room) != 0)
     {
         fprintf(stderr, "JOIN failed\n");
         return 1;

@@ -197,7 +197,7 @@ int client_fd(const Client *c);
 /* All return 0 on success, -1 if the frame could not be sent. Arguments go in
  * the body as ONE RAW BYTE, matching the server's body_byte() in session.c. */
 
-int client_join(Client *c, uint8_t room_id); /* 0 = create a new room */
+int client_join(Client *c, int room_id); /* 0 = create a new room */
 int client_leave(Client *c);
 int client_start(Client *c);
 int client_move(Client *c, int right);   /* 0 left,  1 right      */

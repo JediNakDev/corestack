@@ -153,7 +153,7 @@ static int read_config(void)
                            &config.settle_ms) == 0 &&
                    read_config_int("LOAD_IN_S", config.load_in_s, 1, INT_MAX,
                                    &config.load_in_s) == 0 &&
-                   read_config_int("ROOM_ID", config.room_id, 1, UINT8_MAX,
+                   read_config_int("ROOM_ID", config.room_id, 1, MAX_ROOMS,
                                    &config.room_id) == 0 &&
                    read_config_int("CSV_SAMPLE_EVERY", config.csv_sample_every,
                                    1, INT_MAX, &config.csv_sample_every) == 0
@@ -356,7 +356,7 @@ static int run_phase(int interval_ms, FILE *samples, PhaseStats *stats,
         if (client_connect(&clients[connected], "127.0.0.1", port,
                            env.ca_path) != 0 ||
             client_guest(&clients[connected]) != 0 ||
-            client_join(&clients[connected], (uint8_t)config.room_id) != 0)
+            client_join(&clients[connected], config.room_id) != 0)
             goto fail_clients;
     int restore_result = restore_stdout(saved_stdout);
     saved_stdout = -1;

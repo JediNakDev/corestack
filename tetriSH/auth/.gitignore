@@ -1,0 +1,10 @@
+# Everything here is per-checkout except the CA the client verifies against and
+# the script that mints a key pair.
+#
+# The private key, the signed certificate and the CSR were tracked until
+# 2026-09-14 despite these rules, because gitignore does not apply to files
+# that are already committed. They still exist in history - see the root README.
+*
+!.gitignore
+!cacsertificate.crt
+!generate_keys.sh

@@ -32,7 +32,7 @@ BINS := $(SHARED_BINS) $(BIN_DIR)/tetrisd $(BIN_DIR)/session \
         $(BIN_DIR)/tetrisctl $(BIN_DIR)/tetrisu
 
 .PHONY: all client client-start start
-all: dirs rc secret java $(LIBS) $(BINS)
+all: dirs rc secret cert java $(LIBS) $(BINS)
 
 start: clean all
 	./tetrish
@@ -153,6 +153,9 @@ $(TEST_BIN_DIR)/test_load: tests/test_load.c src/tetrisu/net.c $(BIN_DIR)/tetris
 $(TEST_BIN_DIR)/test_saturation: tests/test_saturation.c src/tetrisu/net.c $(BIN_DIR)/tetrisd $(BIN_DIR)/session $(LIBS) $(HEADERS)
 	$(CC) $(CFLAGS) tests/test_saturation.c src/tetrisu/net.c -o $@ $(LDFLAGS) $(LDLIBS)
 
+$(TEST_BIN_DIR)/bench_latency: tests/bench_latency.c src/tetrisu/net.c $(BIN_DIR)/tetrisd $(BIN_DIR)/session $(LIBS) $(HEADERS)
+	$(CC) $(CFLAGS) tests/bench_latency.c src/tetrisu/net.c -o $@ $(LDFLAGS) $(LDLIBS)
+
 $(TEST_BIN_DIR)/test_render_fixtures: tests/test_render_fixtures.c src/tetrisu/render.c $(LIBTETRISBRAIN_SRCS) $(LIB_DIR)/libtetrisutil.a $(HEADERS)
 	$(CC) $(CFLAGS) $(filter %.c,$^) -o $@ $(LDFLAGS) -ltetrisutil -lncurses
 
@@ -196,7 +199,7 @@ MANUAL_TEST_BINS := $(UI_TEST_BINS) $(TEST_BIN_DIR)/test_client
 # Deliberately outside STRESS_TEST_BINS: it sweeps four command rates back to
 # back, so run_all.sh's stress and ci modes would pay for a measurement run
 # nobody asked for. Driven by `make test-saturation`.
-MEASUREMENT_TEST_BINS := $(TEST_BIN_DIR)/test_saturation
+MEASUREMENT_TEST_BINS := $(TEST_BIN_DIR)/test_saturation $(TEST_BIN_DIR)/bench_latency
 
 FAST_TEST_BINS := $(UNIT_TEST_BINS) $(INTEGRATION_TEST_BINS) $(E2E_TEST_BINS)
 TEST_BINS := $(FAST_TEST_BINS) $(STRESS_TEST_BINS) $(MANUAL_TEST_BINS) \
@@ -209,7 +212,7 @@ gui test-ui: dirs $(UI_TEST_BINS)
 
 .PHONY: test test-fast test-unit test-integration test-e2e test-stress \
 	test-full test-client test-manual test-sanitizer test-stress-sanitizer \
-	test-stress-leaks test-endurance test-saturation test-ci
+	test-stress-leaks test-endurance test-saturation bench-latency test-ci
 
 # The suites that drive the real simpledb jar are skipped by default: the
 # runner binds its socket but never emits <<READY>>, so every one of them
@@ -285,8 +288,14 @@ test-endurance: dirs $(TEST_BIN_DIR)/test_load
 # Latency/throughput sweep. LOAD_IN_S is per command rate, and there are four
 # of them, so the wall clock is roughly 4 x (LOAD_IN_S + 10s). Writes
 # var/saturation/*.csv; the numbers are the deliverable, not the exit status.
-test-saturation: dirs $(MEASUREMENT_TEST_BINS)
+test-saturation: dirs $(TEST_BIN_DIR)/test_saturation
 	LOAD_IN_S=$${LOAD_IN_S:-60} ./$(TEST_BIN_DIR)/test_saturation
+
+# Request-latency percentiles and the throughput where p99 leaves the SLO.
+# Knobs are env vars (BENCH_CLIENTS, BENCH_SLO_MS, ...); tests/bench_latency.sh
+# is the front door and turns flags into them. Writes var/bench/*.csv.
+bench-latency: dirs $(TEST_BIN_DIR)/bench_latency
+	./$(TEST_BIN_DIR)/bench_latency
 
 # LOAD_IN_S, as test-stress and test-full above: without it test_load uses its
 # own 2000s-per-scenario default, three times over.
